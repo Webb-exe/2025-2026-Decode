@@ -1,8 +1,9 @@
-package teamcode.robot;
+package teamcode.robot.threads;
 
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
+
+import teamcode.robot.core.RobotHardware;
 import teamcode.threading.RobotThread;
 
 import java.util.HashMap;
@@ -38,7 +39,7 @@ public class VisionThread extends RobotThread {
     }
     
     public VisionThread() {
-        super("VisionThread", 33); // ~30Hz update rate (typical for vision)
+        super("VisionThread", 100); // 100Hz update rate
     }
 
     @Override
@@ -53,6 +54,8 @@ public class VisionThread extends RobotThread {
     @Override
     protected void runLoop() {
         if (RobotHardware.limelight == null) {
+            telemetry.addData("Status", "No Limelight");
+            telemetry.addData("Targets Detected", false);
             return;
         }
         
@@ -73,12 +76,34 @@ public class VisionThread extends RobotThread {
             
             // Update AprilTag detection
             updateAprilTags(result);
+            
+            // Update telemetry - data persists until next update from this thread
+            telemetry.addData("Status", "Running");
+            telemetry.addData("Targets Detected", targetsDetected);
+            telemetry.addData("Target X", String.format("%.2f°", targetX));
+            telemetry.addData("Target Y", String.format("%.2f°", targetY));
+            telemetry.addData("Target Area", String.format("%.2f%%", targetArea));
+            
+            // Add AprilTag telemetry
+            synchronized (aprilTagsLock) {
+                telemetry.addData("AprilTags Count", aprilTags.size());
+                if (!aprilTags.isEmpty()) {
+                    StringBuilder tagsInfo = new StringBuilder();
+                    aprilTags.forEach((id, tag) -> {
+                        if (tagsInfo.length() > 0) tagsInfo.append(", ");
+                        tagsInfo.append(String.format("ID:%d", id));
+                    });
+                    telemetry.addData("AprilTag IDs", tagsInfo.toString());
+                }
+            }
         } catch (Exception e) {
             handleException(e);
             targetsDetected = false;
             synchronized (aprilTagsLock) {
                 aprilTags = new HashMap<>();
             }
+            telemetry.addData("Status", "Error: " + e.getMessage());
+            telemetry.addData("Targets Detected", false);
         }
     }
     

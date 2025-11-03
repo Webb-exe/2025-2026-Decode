@@ -1,11 +1,16 @@
 package teamcode.teleop;
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import static java.lang.Double.max;
+import static java.lang.Double.min;
+
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import teamcode.robot.RobotHardware;
-import teamcode.robot.TurretThread;
-import teamcode.robot.VisionThread;
+import teamcode.robot.core.Alliance;
+import teamcode.robot.core.RobotHardware;
+import teamcode.robot.subsystems.Shooter;
+import teamcode.robot.threads.MovementThread;
+import teamcode.robot.threads.TurretThread;
+import teamcode.robot.threads.VisionThread;
 import teamcode.threading.ThreadedOpMode;
 
 /**
@@ -15,12 +20,14 @@ import teamcode.threading.ThreadedOpMode;
  */
 @TeleOp(name = "Teleop", group = "Teleop")
 public class Teleop extends ThreadedOpMode {
+    private MovementThread movementThread;
     private TurretThread turretThread;
     private VisionThread visionThread;
     
     @Override
     protected void initializeThreads() {
         // Create and configure threads
+        movementThread = new MovementThread();
         turretThread = new TurretThread();
         visionThread = new VisionThread();
         
@@ -28,40 +35,95 @@ public class Teleop extends ThreadedOpMode {
         turretThread.setVisionThread(visionThread);
         
         // Add threads to manager
+        threadManager.addThread(movementThread);
         threadManager.addThread(visionThread);
         threadManager.addThread(turretThread);
     }
+
+    @Override
+    protected void runInit() {
+        Alliance alliance= Alliance.RED;
+
+        while(opModeInInit()){
+            telemetry.addData("Status", "In Init");
+
+
+            if (gamepad1.xWasPressed()){
+                alliance = Alliance.BLUE;
+            }
+            if (gamepad1.bWasPressed()){
+                alliance = Alliance.RED;
+            }
+            telemetry.update();
+        }
+
+        RobotHardware.setAlliance(alliance);
+    }
+    
+    // State variables for button press detection
+    private boolean firstPressA = false;
+    private boolean firstPressB = false;
+    private boolean firstPressRightBumper = false;
+    private boolean firstPressLeftBumper = false;
     
     @Override
-    protected void runOpModeThreaded() {
-        // Enable turret control
+    protected void onStart() {
+        // Enable turret control when OpMode starts
         turretThread.enable();
+    }
+    
+    @Override
+    protected void mainLoop() {
+        // Main loop iteration - called repeatedly by ThreadedOpMode
+        // Telemetry staging and updates are handled automatically!
         
-        // Run until the end of the match (driver presses STOP)
-        while (opModeIsActive()) {
-            // Main loop - threads run concurrently
-            // Turret automatically tracks targets using vision-based PID
-            
-            // Example: Telemetry update
-            telemetry.addData("Vision Targets", visionThread.hasTargets());
-            telemetry.addData("Target X", visionThread.getTargetX());
-            telemetry.addData("Target Y", visionThread.getTargetY());
-            telemetry.addData("Turret Enabled", turretThread.isEnabled());
-            telemetry.addData("Turret Motor Position", RobotHardware.turretTurnMotor != null ? RobotHardware.turretTurnMotor.getCurrentPosition() : "N/A");
-            telemetry.update();
-            
-            // Small sleep to prevent excessive CPU usage
-            sleep(20);
+        // ===== MOVEMENT CONTROL =====
+        // Update movement thread with gamepad1 input
+        movementThread.setDriveInput(gamepad1);
+        
+        // Toggle precision mode with left trigger (reduces speed to 30%)
+        if (gamepad1.left_trigger > 0.5) {
+            movementThread.setSpeedMultiplier(0.3);
+        } else {
+            movementThread.setSpeedMultiplier(1.0);
         }
         
-        // Disable turret before stopping
-        turretThread.disable();
+        // ===== TURRET CONTROL =====
+        // Turret automatically tracks targets using vision-based PID
+        firstPressA = gamepad1.a && !firstPressA;
+        firstPressB = gamepad1.b && !firstPressB;
+        firstPressRightBumper = gamepad1.right_bumper && !firstPressRightBumper;
+        firstPressLeftBumper = gamepad1.left_bumper && !firstPressLeftBumper;
+
+        if (firstPressA) {
+            turretThread.enable();
+        }
+
+        if (firstPressB) {
+            turretThread.disable();
+        }
+
+        RobotHardware.turretShooterRightMotor.setCurrentPosition(gamepad1.right_trigger);
+        RobotHardware.turretShooterLeftMotor.setCurrentPosition(gamepad1.right_trigger);
+
+        telemetry.addData("Shooter Power", gamepad1.right_trigger);
+
+        // ===== TELEMETRY =====
+        // Just use telemetry.addData() - namespace and updates are handled automatically!
+        telemetry.addData("Runtime", String.format("%.2f s", runtime.seconds()));
+        telemetry.addData("Loop Time", String.format("%.0f ms", runtime.milliseconds()));
+        
+        // Add servo position if available
+        if (RobotHardware.kickerServo != null) {
+            telemetry.addData("Kicker Servo Pos", String.format("%.2f", RobotHardware.kickerServo.getPosition()));
+        }
     }
     
     @Override
     protected void cleanup() {
-        // Additional cleanup if needed
-        // Threads are already stopped by ThreadManager
+        // Disable threads before stopping
+        movementThread.disable();
+        turretThread.disable();
     }
 }
 
