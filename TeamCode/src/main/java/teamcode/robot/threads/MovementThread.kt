@@ -145,10 +145,7 @@ class MovementThread : RobotThread("MovementThread", 5) {
      * Update drive values from gamepad input
      * Call this from your main OpMode thread
      */
-    fun setDriveInput(gamepad: Gamepad?) {
-        if (gamepad == null) return
-
-
+    fun setDriveInput(gamepad: Gamepad) {
         // Standard gamepad controls:
         // Left stick Y = forward/backward
         // Left stick X = strafe left/right

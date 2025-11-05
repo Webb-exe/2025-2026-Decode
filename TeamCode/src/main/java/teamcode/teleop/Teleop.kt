@@ -1,10 +1,12 @@
 package teamcode.teleop
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import dev.nextftc.core.commands.conditionals.switchCommand
 import dev.nextftc.hardware.positionable.SetPosition
 import teamcode.robot.core.Alliance
 import teamcode.robot.core.RobotHardware
 import teamcode.robot.subsystems.Shooter
+import teamcode.robot.threads.InputThread
 import teamcode.robot.threads.MovementThread
 import teamcode.robot.threads.TurretThread
 import teamcode.robot.threads.VisionThread
@@ -20,18 +22,21 @@ class Teleop : ThreadedOpMode() {
     private lateinit var movementThread: MovementThread
     private lateinit var turretThread: TurretThread
     private lateinit var visionThread: VisionThread
+    private lateinit var inputThread: InputThread
+
 
     override fun initializeThreads() {
         // Create and configure threads
         movementThread = MovementThread()
         turretThread = TurretThread()
         visionThread = VisionThread()
-
+        inputThread = InputThread()
 
         // Add threads to manager
         threadManager.addThread(movementThread)
         threadManager.addThread(visionThread)
         threadManager.addThread(turretThread)
+        threadManager.addThread(inputThread)
     }
 
     override fun runInit() {
@@ -61,7 +66,7 @@ class Teleop : ThreadedOpMode() {
 
     override fun onStart() {
         // Enable turret control when OpMode starts
-        turretThread!!.enable()
+        turretThread.enable()
     }
 
     override fun mainLoop() {
@@ -71,14 +76,15 @@ class Teleop : ThreadedOpMode() {
         // ===== MOVEMENT CONTROL =====
         // Update movement thread with gamepad1 input
 
-        movementThread!!.setDriveInput(gamepad1)
+        movementThread.setDriveInput(gamepad1)
+        inputThread.updateGamepads(gamepad1,gamepad2)
 
 
         // Toggle precision mode with left trigger (reduces speed to 30%)
         if (gamepad1.left_trigger > 0.5) {
-            movementThread!!.setSpeedMultiplier(0.3)
+            movementThread.setSpeedMultiplier(0.3)
         } else {
-            movementThread!!.setSpeedMultiplier(1.0)
+            movementThread.setSpeedMultiplier(1.0)
         }
 
 
@@ -91,13 +97,14 @@ class Teleop : ThreadedOpMode() {
 
         if (firstPressA) {
             turretThread.enable()
-            Shooter.
         }
 
         if (firstPressB) {
             turretThread.disable()
 
         }
+
+
 
 
         telemetry.addData("Shooter Power", gamepad1.right_trigger)
