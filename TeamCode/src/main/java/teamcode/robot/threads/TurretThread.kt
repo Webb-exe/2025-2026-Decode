@@ -12,8 +12,8 @@ import kotlin.concurrent.Volatile
  * Uses targetX from VisionThread to keep the target centered.
  */
 class TurretThread : RobotThread("TurretThread", 10) {
-    private var turretPID: PID? = null
-    private var visionThread: VisionThread? = null
+    private lateinit var turretPID: PID
+    private lateinit var visionThread: VisionThread
 
     /**
      * Check if turret control is enabled
@@ -23,17 +23,18 @@ class TurretThread : RobotThread("TurretThread", 10) {
         private set
 
     override fun onStart() {
-        visionThread = VisionThread.current<VisionThread?>()
+        visionThread = current()
+
         turretPID = PID(RobotConfig.TurretPGain, RobotConfig.TurretIGain, RobotConfig.TurretDGain)
-        turretPID!!.setOutputRange(
+        turretPID.setOutputRange(
             -RobotConfig.TurretSpeedClamp,
             RobotConfig.TurretSpeedClamp
         ) // Motor power range
-        turretPID!!.setIntegratorRange(-0.5, 0.5) // Prevent integral windup
-        turretPID!!.setScaleFactor(RobotConfig.TurretScaleFactor)
-        turretPID!!.reset()
+        turretPID.setIntegratorRange(-0.5, 0.5) // Prevent integral windup
+        turretPID.setScaleFactor(RobotConfig.TurretScaleFactor)
+        turretPID.reset()
         // Setpoint is 0.0 to center the target (targetX = 0 means centered)
-        turretPID!!.setSetpoint(0.0)
+        turretPID.setSetpoint(0.0)
     }
 
     override fun runLoop() {
@@ -46,7 +47,7 @@ class TurretThread : RobotThread("TurretThread", 10) {
 
 
         // Only control if vision has targets detected
-        if (!visionThread!!.hasTargets()) {
+        if (!visionThread.hasTargets()) {
             RobotHardware.turretTurnMotor.power = 0.0
             telemetry!!.addData("Status", "No Targets")
             telemetry!!.addData("Enabled", true)
@@ -58,7 +59,7 @@ class TurretThread : RobotThread("TurretThread", 10) {
 
         // Get targetX from vision thread (horizontal offset from crosshair in degrees)
         // Negative targetX means target is to the left, positive means right
-        val aprilTag = visionThread!!.getAprilTag(24)
+        val aprilTag = visionThread.getAprilTag(24)
         if (aprilTag == null) {
             RobotHardware.turretTurnMotor.power = 0.0
             telemetry!!.addData("Status", "No AprilTag 24")
@@ -71,7 +72,7 @@ class TurretThread : RobotThread("TurretThread", 10) {
 
         // Calculate PID output based on vision data
         // Setpoint is 0.0 (centered), measurement is targetX
-        val output = turretPID!!.calculate(aprilTag.xDegrees)
+        val output = turretPID.calculate(aprilTag.xDegrees)
 
 
         // Apply output to motor

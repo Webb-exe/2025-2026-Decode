@@ -12,13 +12,12 @@ import kotlin.concurrent.Volatile
 abstract class RobotThread : Thread {
     /** Automatically register this instance as the singleton for its class  */
     private fun registerAsGlobal() {
-        val previous: RobotThread? = GLOBALS.putIfAbsent(javaClass, this)
-        check(!(previous != null && previous !== this)) { "Multiple instances of " + javaClass.getSimpleName() + " are not allowed." }
+        register(this)
     }
 
     /** Automatically unregister on stop  */
     private fun unregisterGlobal() {
-        GLOBALS.compute(javaClass) { k: Class<out RobotThread?>?, v: RobotThread? -> if (v === this) null else v }
+        unregister(this)
     }
 
     /**
@@ -36,8 +35,10 @@ abstract class RobotThread : Thread {
         protected set
     protected var runtime: ElapsedTime? = null
     protected val lock: Any = Any()
-    @JvmField
-    protected var telemetry: RobotTelemetry? = null
+    protected lateinit var telemetry: RobotTelemetry;
+
+    @get:JvmName("getTelemetryOrThrow")
+    val telemetrySafe get() = telemetry
 
     /**
      * Get the update interval in milliseconds
@@ -92,9 +93,9 @@ abstract class RobotThread : Thread {
                 try {
                     runLoop()
                     if (telemetry != null) telemetry!!.commitStaging()
-                } catch (e: Exception) {
+                } catch (t: Throwable) {
                     if (telemetry != null) telemetry!!.discardStaging()
-                    handleException(e)
+                    handleException(t)
                 }
 
                 try {
@@ -132,8 +133,8 @@ abstract class RobotThread : Thread {
     /**
      * Handle exceptions during thread execution
      */
-    protected fun handleException(e: Exception) {
-        e.printStackTrace()
+    protected open fun handleException(t: Throwable) {
+        t.printStackTrace()
     }
 
     /**
@@ -184,19 +185,6 @@ abstract class RobotThread : Thread {
     }
 
     /**
-     * Set the telemetry system for this thread.
-     * Should be called before starting the thread.
-     * @param telemetry The shared telemetry system
-     */
-    fun setTelemetry(telemetry: RobotTelemetry?) {
-        this.telemetry = telemetry
-        // Set namespace for this thread
-        if (telemetry != null) {
-            telemetry.setNamespace(getName())
-        }
-    }
-
-    /**
      * Add telemetry data for this thread.
      * Uses the thread name as the namespace.
      * @param key The telemetry key
@@ -235,17 +223,48 @@ abstract class RobotThread : Thread {
 
     companion object {
         // Automatically tracks ONE instance per subclass
-        private val GLOBALS = ConcurrentHashMap<Class<out RobotThread?>?, RobotThread?>()
+        private val globals = ConcurrentHashMap<Class<out RobotThread>, RobotThread>()
 
+        // Kotlin callers: zero-arg, type-inferred
+        @JvmStatic
+        inline fun <reified T : RobotThread> current(): T =
+            currentByClass(T::class.java)
+
+        // Java callers: pass the Class<T>
+        @JvmStatic
+        fun <T : RobotThread> currentByClass(type: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return (globals[type] as? T)
+                ?: error("${type.simpleName} is not running yet")
+        }
+
+        @JvmStatic
+        internal fun register(instance: RobotThread) {
+            val prev = globals.putIfAbsent(instance.javaClass, instance)
+            require(prev == null || prev === instance) {
+                "Multiple ${instance.javaClass.simpleName} instances are not allowed"
+            }
+        }
+
+        @JvmStatic
+        internal fun unregister(instance: RobotThread) {
+            globals.compute(instance.javaClass) { _, v -> if (v === instance) null else v }
+        }
+
+        // Legacy methods for backward compatibility
+        @JvmStatic
         fun <T : RobotThread?> currentOf(type: Class<T?>): T? {
-            val instance: RobotThread? = GLOBALS.get(type)
-            checkNotNull(instance) { type.getSimpleName() + " has not been constructed yet." }
+            val instance: RobotThread? = globals.get(type)
+            checkNotNull(instance) { type.simpleName + " has not been constructed yet." }
+            @Suppress("UNCHECKED_CAST")
             return instance as T
         }
 
+        @JvmStatic
         fun <T : RobotThread?> current(type: Class<T?>): T? {
-            val instance: RobotThread? = GLOBALS.get(type)
-            checkNotNull(instance) { type.getSimpleName() + " has not started yet." }
+            val instance: RobotThread? = globals.get(type)
+            checkNotNull(instance) { type.simpleName + " has not started yet." }
+            @Suppress("UNCHECKED_CAST")
             return instance as T
         }
     }

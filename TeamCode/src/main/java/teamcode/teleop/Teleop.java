@@ -31,9 +31,6 @@ public class Teleop extends ThreadedOpMode {
         turretThread = new TurretThread();
         visionThread = new VisionThread();
         
-        // Connect vision thread to turret thread for vision-based PID control
-        turretThread.setVisionThread(visionThread);
-        
         // Add threads to manager
         threadManager.addThread(movementThread);
         threadManager.addThread(visionThread);
