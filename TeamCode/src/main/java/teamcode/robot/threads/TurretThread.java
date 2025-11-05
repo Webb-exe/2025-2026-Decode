@@ -18,15 +18,9 @@ public class TurretThread extends RobotThread {
         super("TurretThread", 10); // 100Hz update rate
     }
     
-    /**
-     * Set the VisionThread reference for vision-based PID control.
-     */
-    public void setVisionThread(VisionThread visionThread) {
-        this.visionThread = visionThread;
-    }
-    
     @Override
     protected void onStart() {
+        visionThread= VisionThread.current(VisionThread.class);
         turretPID = new PID(RobotConfig.TurretPGain, RobotConfig.TurretIGain, RobotConfig.TurretDGain);
         turretPID.setOutputRange(-RobotConfig.TurretSpeedClamp,RobotConfig.TurretSpeedClamp); // Motor power range
         turretPID.setIntegratorRange(-0.5, 0.5); // Prevent integral windup
@@ -42,19 +36,6 @@ public class TurretThread extends RobotThread {
             telemetry.addData("Status", "Disabled");
             telemetry.addData("Enabled", false);
             telemetry.addData("Motor Power", 0.0);
-            return;
-        }
-        
-        if (RobotHardware.turretTurnMotor == null) {
-            telemetry.addData("Status", "No Motor");
-            telemetry.addData("Enabled", true);
-            return;
-        }
-        
-        if (visionThread == null) {
-            telemetry.addData("Status", "No Vision Thread");
-            telemetry.addData("Enabled", true);
-            RobotHardware.turretTurnMotor.setPower(0.0);
             return;
         }
         

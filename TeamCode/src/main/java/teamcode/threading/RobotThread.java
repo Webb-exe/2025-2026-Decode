@@ -1,6 +1,9 @@
 package teamcode.threading;
 
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import java.util.concurrent.ConcurrentHashMap;
+
 import teamcode.telemetry.RobotTelemetry;
 
 /**
@@ -8,6 +11,39 @@ import teamcode.telemetry.RobotTelemetry;
  * Provides common functionality for thread lifecycle management and synchronization.
  */
 public abstract class RobotThread extends Thread {
+    // Automatically tracks ONE instance per subclass
+    private static final ConcurrentHashMap<Class<? extends RobotThread>, RobotThread> GLOBALS =
+            new ConcurrentHashMap<>();
+
+    @SuppressWarnings("unchecked")
+    public static <T extends RobotThread> T currentOf(Class<T> type) {
+        RobotThread instance = GLOBALS.get(type);
+        if (instance == null)
+            throw new IllegalStateException(type.getSimpleName() + " has not been constructed yet.");
+        return (T) instance;
+    }
+
+    public static <T extends RobotThread> T current(Class<T> type) {
+        RobotThread instance = GLOBALS.get(type);
+        if (instance == null)
+            throw new IllegalStateException(type.getSimpleName() + " has not started yet.");
+        return (T) instance;
+    }
+
+    /** Automatically register this instance as the singleton for its class */
+    private void registerAsGlobal() {
+        RobotThread previous = GLOBALS.putIfAbsent(getClass(), this);
+        if (previous != null && previous != this) {
+            throw new IllegalStateException(
+                    "Multiple instances of " + getClass().getSimpleName() + " are not allowed."
+            );
+        }
+    }
+
+    /** Automatically unregister on stop */
+    private void unregisterGlobal() {
+        GLOBALS.compute(getClass(), (k, v) -> v == this ? null : v);
+    }
     protected volatile boolean running = false;
     protected volatile boolean paused = false;
     protected ElapsedTime runtime;
@@ -40,59 +76,51 @@ public abstract class RobotThread extends Thread {
     public final void run() {
         running = true;
         runtime.reset();
-        
-        // Set telemetry namespace for this thread automatically
-        // This persists for the entire thread lifecycle due to ThreadLocal
-        if (telemetry != null) {
+
+        registerAsGlobal();
+
+        if (telemetry != null)
             telemetry.setNamespace(getName());
-        }
-        
+
         onStart();
-        
-        while (running && !isInterrupted()) {
-            synchronized (lock) {
-                while (paused && running) {
-                    try {
-                        lock.wait();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
+
+        try {
+            while (running && !isInterrupted()) {
+                synchronized (lock) {
+                    while (paused && running) {
+                        try { lock.wait(); }
+                        catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
                     }
                 }
-            }
-            
-            if (!running) break;
-            
-            // Use atomic staging pattern to prevent telemetry flickering
-            if (telemetry != null) {
-                telemetry.beginStaging();
-            }
-            
-            try {
-                runLoop();
-                
-                // Commit staging buffer atomically - no flickering!
-                if (telemetry != null) {
-                    telemetry.commitStaging();
+
+                if (!running) break;
+
+                if (telemetry != null) telemetry.beginStaging();
+                try {
+                    runLoop();
+                    if (telemetry != null) telemetry.commitStaging();
+                } catch (Exception e) {
+                    if (telemetry != null) telemetry.discardStaging();
+                    handleException(e);
                 }
-            } catch (Exception e) {
-                // Discard staging on error to prevent corrupted telemetry
-                if (telemetry != null) {
-                    telemetry.discardStaging();
+
+                try { Thread.sleep(updateIntervalMs); }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
-                handleException(e);
-            }
-            
-            // Sleep for update interval
-            try {
-                Thread.sleep(updateIntervalMs);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
             }
         }
-        
-        onStop();
+        finally {
+            try { onStop(); }
+            finally {
+                // ✅ UNREGISTER on shutdown
+                unregisterGlobal();
+            }
+        }
     }
     
     /**
