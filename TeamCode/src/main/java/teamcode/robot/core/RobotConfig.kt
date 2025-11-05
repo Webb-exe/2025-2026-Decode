@@ -9,7 +9,9 @@ object RobotConfig {
     var TurretDGain: Double = 0.1
     var TurretSpeedClamp: Double = 0.5
     var TurretScaleFactor: Double = 0.01
+    @JvmField
     var ShooterPower: Double = 0.8
+    @JvmField
     var ShooterIdlePower: Double = 0.2
     var TurnScale: Double = 0.5
     var PowerScale: Double = 0.5

@@ -34,7 +34,7 @@ class TurretThread : RobotThread("TurretThread", 10) {
         turretPID.setScaleFactor(RobotConfig.TurretScaleFactor)
         turretPID.reset()
         // Setpoint is 0.0 to center the target (targetX = 0 means centered)
-        turretPID.setSetpoint(0.0)
+        turretPID.setpoint = 0.0
     }
 
     override fun runLoop() {

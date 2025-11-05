@@ -11,11 +11,13 @@ import teamcode.telemetry.RobotTelemetry
  * Extends LinearOpMode and provides thread management functionality.
  */
 abstract class ThreadedOpMode : LinearOpMode() {
-    protected var threadManager: ThreadManager? = null
-    protected var runtime: ElapsedTime? = null
+
+    protected lateinit var threadManager: ThreadManager
+
+    protected lateinit var runtime: ElapsedTime
 
     // Unified telemetry system - use this everywhere!
-    protected var telemetry: RobotTelemetry? = null
+    protected lateinit var telemetry: RobotTelemetry
 
     /**
      * Get the original FTC telemetry object
@@ -47,22 +49,22 @@ abstract class ThreadedOpMode : LinearOpMode() {
 
 
         // Set telemetry for all threads
-        for (thread in threadManager!!.getThreads()) {
-            thread.telemetry = telemetry!!
+        for (thread in threadManager.getThreads()) {
+            thread?.telemetry = telemetry
         }
 
-        telemetry!!.addData("Status", "Initialized")
+        telemetry.addData("Status", "Initialized")
         runInit()
-        telemetry!!.update()
+        telemetry.update()
 
 
         // Wait for the game to start (driver presses PLAY)
         waitForStart()
-        runtime!!.reset()
+        runtime.reset()
 
 
         // Start all threads
-        threadManager!!.startAll()
+        threadManager.startAll()
 
 
         // Call onStart hook for user initialization after threads start
@@ -72,8 +74,8 @@ abstract class ThreadedOpMode : LinearOpMode() {
             // Run the main opmode loop with automatic telemetry staging
             while (opModeIsActive()) {
                 // Use atomic staging pattern (same as threads) to prevent flickering
-                telemetry!!.namespace = "Main"
-                telemetry!!.beginStaging()
+                telemetry.namespace = "Main"
+                telemetry.beginStaging()
 
                 try {
                     // Call user's loop method
@@ -81,20 +83,20 @@ abstract class ThreadedOpMode : LinearOpMode() {
 
 
                     // Commit staging buffer atomically
-                    telemetry!!.commitStaging()
+                    telemetry.commitStaging()
                 } catch (e: Exception) {
                     // Discard staging on error
-                    telemetry!!.discardStaging()
+                    telemetry.discardStaging()
                     throw e
                 }
 
 
                 // Update telemetry - displays all thread data + main loop data
-                telemetry!!.update()
+                telemetry.update()
             }
         } finally {
             // Ensure threads are stopped even if exception occurs
-            threadManager!!.stopAll()
+            threadManager.stopAll()
             cleanup()
         }
     }
@@ -134,20 +136,20 @@ abstract class ThreadedOpMode : LinearOpMode() {
      * Get the thread manager instance
      */
     fun getThreadManager(): ThreadManager {
-        return threadManager!!
+        return threadManager
     }
 
     val runtimeTime: ElapsedTime
         /**
          * Get the runtime timer
          */
-        get() = runtime!!
+        get() = runtime
 
     /**
      * Get the unified telemetry system
      */
     fun getTelemetry(): RobotTelemetry {
-        return telemetry!!
+        return telemetry
     }
 }
 

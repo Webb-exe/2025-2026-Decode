@@ -7,83 +7,83 @@ import com.qualcomm.robotcore.hardware.Servo
 import com.qualcomm.robotcore.util.ElapsedTime
 import dev.nextftc.hardware.impl.MotorEx
 import dev.nextftc.hardware.impl.ServoEx
+import dev.nextftc.hardware.positionable.SetPosition
+import kotlin.concurrent.Volatile
 
 object RobotHardware {
-    var opMode: LinearOpMode? = null
-    var runtime: ElapsedTime? = null
+    lateinit var opMode: LinearOpMode
+    lateinit var runtime: ElapsedTime
 
     // Movement Motors
-    var leftFront: MotorEx? = null
-    var leftBack: MotorEx? = null
-    var rightFront: MotorEx? = null
-    var rightBack: MotorEx? = null
+    lateinit var leftFront: MotorEx
+    lateinit var leftBack: MotorEx
+    lateinit var rightFront: MotorEx
+    lateinit var rightBack: MotorEx
 
     // Turret
-    var turretTurnMotor: MotorEx? = null
-    var turretShooterLeftMotor: MotorEx? = null
-    var turretShooterRightMotor: MotorEx? = null
+    lateinit var turretTurnMotor: MotorEx
+    lateinit var turretShooterLeftMotor: MotorEx
+    lateinit var turretShooterRightMotor: MotorEx
 
     // Servo
-    var kickerServo: ServoEx? = null
+    lateinit var kickerServo: ServoEx
 
     // Limelight
-    var limelight: Limelight3A? = null
+    lateinit var limelight: Limelight3A
 
     // State
-    var alliance: Alliance? = Alliance.RED
+    var alliance: Alliance = Alliance.RED
+    @Volatile
+    var DriverState: RobotStateEnum = RobotStateEnum.IDLE
 
 
     private fun setHardware() {
         leftFront = MotorEx(
-            opMode!!.hardwareMap.get<DcMotorEx?>(
+            opMode.hardwareMap.get(
                 DcMotorEx::class.java,
                 "leftFrontDrive"
             )
         ).reversed()
         leftBack = MotorEx(
-            opMode!!.hardwareMap.get<DcMotorEx?>(
+            opMode.hardwareMap.get(
                 DcMotorEx::class.java,
                 "leftBackDrive"
             )
         ).reversed()
         rightFront =
-            MotorEx(opMode!!.hardwareMap.get<DcMotorEx?>(DcMotorEx::class.java, "rightFrontDrive"))
+            MotorEx(opMode.hardwareMap.get(DcMotorEx::class.java, "rightFrontDrive"))
         rightBack =
-            MotorEx(opMode!!.hardwareMap.get<DcMotorEx?>(DcMotorEx::class.java, "rightBackDrive"))
+            MotorEx(opMode.hardwareMap.get(DcMotorEx::class.java, "rightBackDrive"))
 
         turretTurnMotor = MotorEx(
-            opMode!!.hardwareMap.get<DcMotorEx?>(
+            opMode.hardwareMap.get(
                 DcMotorEx::class.java,
                 "turretTurnMotor"
             )
         ).reversed()
         turretShooterLeftMotor = MotorEx(
-            opMode!!.hardwareMap.get<DcMotorEx?>(
+            opMode.hardwareMap.get(
                 DcMotorEx::class.java,
                 "turretShooterLeftMotor"
             )
         ).reversed()
         turretShooterRightMotor = MotorEx(
-            opMode!!.hardwareMap.get<DcMotorEx?>(
+            opMode.hardwareMap.get(
                 DcMotorEx::class.java,
                 "turretShooterRightMotor"
             )
         )
 
-        kickerServo = ServoEx(opMode!!.hardwareMap.get<Servo?>(Servo::class.java, "kickerServo"))
+        kickerServo = ServoEx(opMode.hardwareMap.get(Servo::class.java, "kickerServo"))
 
-        limelight = opMode!!.hardwareMap.get<Limelight3A?>(Limelight3A::class.java, "limelight")
+        limelight = opMode.hardwareMap.get(Limelight3A::class.java, "limelight")
     }
 
     private fun initHardware() {
-        kickerServo!!.position = 0
+        SetPosition(kickerServo, 0.0)
     }
 
-    fun setAlliance(allianceInput: Alliance?) {
-        alliance = allianceInput
-    }
-
-    fun init(OpModeInput: LinearOpMode?, runtimeInput: ElapsedTime?) {
+    fun init(OpModeInput: LinearOpMode, runtimeInput: ElapsedTime) {
         opMode = OpModeInput
         runtime = runtimeInput
         setHardware()

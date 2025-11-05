@@ -1,8 +1,10 @@
 package teamcode.teleop
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import dev.nextftc.hardware.positionable.SetPosition
 import teamcode.robot.core.Alliance
 import teamcode.robot.core.RobotHardware
+import teamcode.robot.subsystems.Shooter
 import teamcode.robot.threads.MovementThread
 import teamcode.robot.threads.TurretThread
 import teamcode.robot.threads.VisionThread
@@ -15,9 +17,9 @@ import teamcode.threading.ThreadedOpMode
  */
 @TeleOp(name = "Teleop", group = "Teleop")
 class Teleop : ThreadedOpMode() {
-    private var movementThread: MovementThread? = null
-    private var turretThread: TurretThread? = null
-    private var visionThread: VisionThread? = null
+    private lateinit var movementThread: MovementThread
+    private lateinit var turretThread: TurretThread
+    private lateinit var visionThread: VisionThread
 
     override fun initializeThreads() {
         // Create and configure threads
@@ -88,15 +90,15 @@ class Teleop : ThreadedOpMode() {
         firstPressLeftBumper = gamepad1.left_bumper && !firstPressLeftBumper
 
         if (firstPressA) {
-            turretThread!!.enable()
+            turretThread.enable()
+            Shooter.
         }
 
         if (firstPressB) {
-            turretThread!!.disable()
+            turretThread.disable()
+
         }
 
-        RobotHardware.turretShooterRightMotor.currentPosition = gamepad1.right_trigger
-        RobotHardware.turretShooterLeftMotor.currentPosition = gamepad1.right_trigger
 
         telemetry.addData("Shooter Power", gamepad1.right_trigger)
 
@@ -105,20 +107,16 @@ class Teleop : ThreadedOpMode() {
         telemetry.addData("Runtime", String.format("%.2f s", runtime!!.seconds()))
         telemetry.addData("Loop Time", String.format("%.0f ms", runtime!!.milliseconds()))
 
-
-        // Add servo position if available
-        if (RobotHardware.kickerServo != null) {
-            telemetry.addData(
-                "Kicker Servo Pos",
-                String.format("%.2f", RobotHardware.kickerServo.position)
-            )
-        }
+        telemetry.addData(
+            "Kicker Servo Pos",
+            String.format("%.2f", RobotHardware.kickerServo.position)
+        )
     }
 
     override fun cleanup() {
         // Disable threads before stopping
-        movementThread!!.disable()
-        turretThread!!.disable()
+        movementThread.disable()
+        turretThread.disable()
     }
 }
 

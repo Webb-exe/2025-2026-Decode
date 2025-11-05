@@ -2,6 +2,7 @@ package teamcode.robot.threads
 
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.Gamepad
+import dev.nextftc.hardware.powerable.SetPower
 import teamcode.robot.core.RobotConfig
 import teamcode.robot.core.RobotHardware
 import teamcode.threading.RobotThread
@@ -57,19 +58,18 @@ class MovementThread : RobotThread("MovementThread", 5) {
 
     override fun onStart() {
         // Initialize drive motors to brake mode (optional)
-        if (RobotHardware.leftFront != null) {
-            RobotHardware.leftFront.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            RobotHardware.leftBack.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            RobotHardware.rightFront.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            RobotHardware.rightBack.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-        }
+        RobotHardware.leftFront.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        RobotHardware.leftBack.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        RobotHardware.rightFront.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        RobotHardware.rightBack.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+
     }
 
     override fun runLoop() {
-        if (!this.isEnabled || RobotHardware.leftFront == null) {
+        if (!this.isEnabled) {
             // Update telemetry even when disabled
-            telemetry!!.addData("Status", "Disabled")
-            telemetry!!.addData("Enabled", false)
+            telemetry.addData("Status", "Disabled")
+            telemetry.addData("Enabled", false)
             return
         }
 
@@ -121,24 +121,24 @@ class MovementThread : RobotThread("MovementThread", 5) {
 
 
         // Set motor powers
-        RobotHardware.leftFront.power = leftFrontPower
+        SetPower(RobotHardware.leftFront, leftFrontPower)
         RobotHardware.rightFront.power = rightFrontPower
         RobotHardware.leftBack.power = leftBackPower
         RobotHardware.rightBack.power = rightBackPower
 
 
         // Update telemetry - data persists until next update from this thread
-        telemetry!!.addData("Status", "Running")
-        telemetry!!.addData("Enabled", true)
-        telemetry!!.addData("Speed Multiplier", String.format("%.1f%%", speedMultiplier * 100))
-        telemetry!!.addData("Field Centric", this.isFieldCentric)
-        telemetry!!.addData("Drive Y", String.format("%.2f", driveY))
-        telemetry!!.addData("Drive X", String.format("%.2f", driveX))
-        telemetry!!.addData("Drive Rot", String.format("%.2f", driveRot))
-        telemetry!!.addData("LF Power", String.format("%.2f", leftFrontPower))
-        telemetry!!.addData("RF Power", String.format("%.2f", rightFrontPower))
-        telemetry!!.addData("LB Power", String.format("%.2f", leftBackPower))
-        telemetry!!.addData("RB Power", String.format("%.2f", rightBackPower))
+        telemetry.addData("Status", "Running")
+        telemetry.addData("Enabled", true)
+        telemetry.addData("Speed Multiplier", String.format("%.1f%%", speedMultiplier * 100))
+        telemetry.addData("Field Centric", this.isFieldCentric)
+        telemetry.addData("Drive Y", String.format("%.2f", driveY))
+        telemetry.addData("Drive X", String.format("%.2f", driveX))
+        telemetry.addData("Drive Rot", String.format("%.2f", driveRot))
+        telemetry.addData("LF Power", String.format("%.2f", leftFrontPower))
+        telemetry.addData("RF Power", String.format("%.2f", rightFrontPower))
+        telemetry.addData("LB Power", String.format("%.2f", leftBackPower))
+        telemetry.addData("RB Power", String.format("%.2f", rightBackPower))
     }
 
     /**

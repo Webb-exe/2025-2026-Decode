@@ -8,6 +8,7 @@ import teamcode.robot.core.RobotConfig
 import teamcode.robot.core.RobotHardware
 
 class Shooter : Subsystem {
+    override fun initialize(){}
     fun activateShooter(): Command {
         return ParallelGroup(
             SetPower(RobotHardware.turretShooterLeftMotor, RobotConfig.ShooterPower),

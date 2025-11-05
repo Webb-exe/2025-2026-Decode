@@ -35,7 +35,8 @@ abstract class RobotThread : Thread {
         protected set
     protected var runtime: ElapsedTime? = null
     protected val lock: Any = Any()
-    protected lateinit var telemetry: RobotTelemetry;
+    lateinit var telemetry: RobotTelemetry
+
 
     @get:JvmName("getTelemetryOrThrow")
     val telemetrySafe get() = telemetry
@@ -70,7 +71,7 @@ abstract class RobotThread : Thread {
 
         registerAsGlobal()
 
-        if (telemetry != null) telemetry!!.setNamespace(getName())
+        telemetry.namespace = name
 
         onStart()
 
@@ -89,12 +90,12 @@ abstract class RobotThread : Thread {
 
                 if (!this.isRunning) break
 
-                if (telemetry != null) telemetry!!.beginStaging()
+                telemetry.beginStaging()
                 try {
                     runLoop()
-                    if (telemetry != null) telemetry!!.commitStaging()
+                    telemetry.commitStaging()
                 } catch (t: Throwable) {
-                    if (telemetry != null) telemetry!!.discardStaging()
+                    telemetry.discardStaging()
                     handleException(t)
                 }
 
@@ -190,12 +191,10 @@ abstract class RobotThread : Thread {
      * @param key The telemetry key
      * @param value The telemetry value
      */
-    protected fun addTelemetry(key: String?, value: Any?) {
-        if (telemetry != null) {
+    protected fun addTelemetry(key: String, value: Any) {
             // Ensure namespace is set for this thread
-            telemetry!!.setNamespace(getName())
-            telemetry!!.addData(key, value)
-        }
+        telemetry.namespace = getName()
+        telemetry.addData(key, value)
     }
 
     /**
@@ -204,21 +203,19 @@ abstract class RobotThread : Thread {
      * @param format Format string
      * @param args Format arguments
      */
-    protected fun addTelemetry(key: String?, format: String?, vararg args: Any?) {
-        if (telemetry != null) {
-            // Ensure namespace is set for this thread
-            telemetry!!.setNamespace(getName())
-            telemetry!!.addData(key, format, *args)
-        }
+    protected fun addTelemetry(key: String, format: String, vararg args: Any) {
+        // Ensure namespace is set for this thread
+        telemetry.namespace = getName()
+        telemetry.addData(key, format, *args)
+
     }
 
     /**
      * Clear all telemetry data for this thread.
      */
     protected fun clearTelemetry() {
-        if (telemetry != null) {
-            telemetry!!.clearNamespace(getName())
-        }
+        telemetry.clearNamespace(getName())
+
     }
 
     companion object {
