@@ -32,6 +32,8 @@ public class RobotHardware {
 
     // State
     public static Alliance alliance=Alliance.RED;
+    public volatile RobotStateEnum DriverState=RobotStateEnum.IDLE;
+
 
     private RobotHardware(){}
 

@@ -1,5 +1,7 @@
 package teamcode.robot.threads;
 
+import static java.lang.Math.abs;
+
 import com.qualcomm.robotcore.hardware.Gamepad;
 import teamcode.robot.core.RobotHardware;
 import teamcode.threading.RobotThread;
@@ -57,25 +59,27 @@ public class MovementThread extends RobotThread {
             y = temp;
         }
         
-        // Mecanum drive kinematics
-        // Left front = y + x + rot
-        // Right front = y - x - rot
-        // Left back = y - x + rot
-        // Right back = y + x - rot
-        double leftFrontPower = y + x + rot;
-        double rightFrontPower = y - x - rot;
-        double leftBackPower = y - x + rot;
-        double rightBackPower = y + x - rot;
-        
-        // Normalize powers to ensure no value exceeds 1.0
-        double maxPower = Math.max(Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower)),
-                                   Math.max(Math.abs(leftBackPower), Math.abs(rightBackPower)));
-        
-        if (maxPower > 1.0) {
-            leftFrontPower /= maxPower;
-            rightFrontPower /= maxPower;
-            leftBackPower /= maxPower;
-            rightBackPower /= maxPower;
+        // Scaled Mecanum kinematics with theta+turn scaling
+        double turn = rot * RobotConfig.TurnScale;
+
+        double theta = Math.atan2(y, x);
+        double power = Math.hypot(x, y) * RobotConfig.PowerScale;
+
+        double sin = Math.sin(theta - Math.PI / 4);
+        double cos = Math.cos(theta - Math.PI / 4);
+        double max = Math.max(Math.abs(sin), Math.abs(cos));
+
+        double leftFrontPower = power * cos / max + turn;
+        double rightFrontPower = power * sin / max - turn;
+        double leftBackPower = power * sin / max + turn;
+        double rightBackPower = power * cos / max - turn;
+
+        // Normalize speeds if total demand is over 1.0
+        if ((power + Math.abs(turn)) > 1) {
+            leftFrontPower /= (power + Math.abs(turn));
+            rightFrontPower /= (power + Math.abs(turn));
+            leftBackPower /= (power + Math.abs(turn));
+            rightBackPower /= (power + Math.abs(turn));
         }
         
         // Apply speed multiplier
@@ -115,20 +119,28 @@ public class MovementThread extends RobotThread {
         // Left stick Y = forward/backward
         // Left stick X = strafe left/right
         // Right stick X = rotation
-        this.driveY = -gamepad.left_stick_y;  // Y is inverted on gamepad
-        this.driveX = gamepad.left_stick_x;
-        this.driveRot = gamepad.right_stick_x;
+        this.setDriveValues(-gamepad.left_stick_y, gamepad.left_stick_x, gamepad.right_stick_x);
     }
     
     /**
      * Manually set drive values (for autonomous or custom control)
+     * Applies cubic-style scaling for smoother control, but keeps sign and zero checks clear.
+     * Uses the same power function for all axes and short-circuits for zeros.
      */
     public void setDriveValues(double y, double x, double rotation) {
-        this.driveY = y;
-        this.driveX = x;
-        this.driveRot = rotation;
+        this.driveY = scaleInput(y, 1.8,1.8);
+        this.driveX = scaleInput(x, 1.8,1.8);
+        this.driveRot = scaleInput(rotation, 2.0,1.2);
     }
-    
+
+    /**
+     * Scales joystick input while preserving the sign.
+     * For zero input, returns zero directly.
+     */
+    private double scaleInput(double input, double exponent,double linear) {
+        if (input == 0.0) return 0.0;
+        return Math.copySign(Math.pow(Math.abs(input), exponent), input)*linear;
+    }
     /**
      * Set speed multiplier (0.0 to 1.0)
      * Useful for precision mode vs speed mode
