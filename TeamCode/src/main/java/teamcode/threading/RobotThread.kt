@@ -235,6 +235,107 @@ abstract class RobotThread : Thread {
                 ?: error("${type.simpleName} is not running yet")
         }
 
+
+        /**
+        * Wait for a thread of the specified type to become available.
+        * Useful when threads start concurrently and one depends on another.
+        *
+        * @param timeoutMs Maximum time to wait in milliseconds (default: 1000ms)
+        * @param pollIntervalMs Time between checks in milliseconds (default: 10ms)
+        * @return The thread instance when it becomes available
+        * @throws IllegalStateException if the thread doesn't become available within the timeout
+        *
+        * Example usage:
+        * ```
+        * val vision = RobotThread.waitFor<VisionSubsystem>()
+        * ```
+        */
+        @JvmStatic
+        inline fun <reified T : RobotThread> waitFor(pollIntervalMs: Long = 10): T =
+            waitForByClass(T::class.java, pollIntervalMs)
+
+        /**
+         * Wait for a thread of the specified type to become available.
+         * Useful when threads start concurrently and one depends on another.
+         * 
+         * @param timeoutMs Maximum time to wait in milliseconds (default: 1000ms)
+         * @param pollIntervalMs Time between checks in milliseconds (default: 10ms)
+         * @return The thread instance when it becomes available
+         * @throws IllegalStateException if the thread doesn't become available within the timeout
+         * 
+         * Example usage:
+         * ```
+         * val vision = RobotThread.waitFor<VisionSubsystem>()
+         * ```
+         */
+        @JvmStatic
+        inline fun <reified T : RobotThread> waitFor(timeoutMs: Long = 1000, pollIntervalMs: Long = 10): T =
+            waitForByClass(T::class.java, timeoutMs, pollIntervalMs)
+
+        /**
+         * Wait for a thread of the specified type to become available (Java-compatible version).
+         * 
+         * @param type The class of the thread to wait for
+         * @param timeoutMs Maximum time to wait in milliseconds (default: 1000ms)
+         * @param pollIntervalMs Time between checks in milliseconds (default: 10ms)
+         * @return The thread instance when it becomes available
+         * @throws IllegalStateException if the thread doesn't become available within the timeout
+         */
+        @JvmStatic
+        fun <T : RobotThread> waitForByClass(
+            type: Class<T>,
+            timeoutMs: Long = 1000,
+            pollIntervalMs: Long = 10
+        ): T {
+            val maxRetries = (timeoutMs / pollIntervalMs).toInt().coerceAtLeast(1)
+            var retries = maxRetries
+            
+            while (retries > 0) {
+                @Suppress("UNCHECKED_CAST")
+                val instance = globals[type] as? T
+                if (instance != null) {
+                    return instance
+                }
+                
+                retries--
+                if (retries > 0) {
+                    try {
+                        Thread.sleep(pollIntervalMs)
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        throw IllegalStateException("Interrupted while waiting for ${type.simpleName}", e)
+                    }
+                }
+            }
+            
+            throw IllegalStateException(
+                "${type.simpleName} did not become available within ${timeoutMs}ms"
+            )
+        }
+
+        @JvmStatic
+        fun <T : RobotThread> waitForByClass(
+            type: Class<T>,
+            pollIntervalMs: Long = 10
+        ): T {
+            while (true) {
+                @Suppress("UNCHECKED_CAST")
+                val instance = globals[type] as? T
+                if (instance != null) {
+                    return instance
+                }
+
+                    try {
+                        Thread.sleep(pollIntervalMs)
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        throw IllegalStateException("Interrupted while waiting for ${type.simpleName}", e)
+                    }
+
+            }
+
+        }
+
         @JvmStatic
         internal fun register(instance: RobotThread) {
             val prev = globals.putIfAbsent(instance.javaClass, instance)

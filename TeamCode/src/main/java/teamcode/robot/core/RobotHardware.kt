@@ -2,12 +2,10 @@ package teamcode.robot.core
 
 import com.qualcomm.hardware.limelightvision.Limelight3A
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import com.qualcomm.robotcore.hardware.DcMotorEx
-import com.qualcomm.robotcore.hardware.Servo
 import com.qualcomm.robotcore.util.ElapsedTime
-import dev.nextftc.hardware.impl.MotorEx
-import dev.nextftc.hardware.impl.ServoEx
-import dev.nextftc.hardware.positionable.SetPosition
+import com.seattlesolvers.solverslib.hardware.motors.Motor
+import com.seattlesolvers.solverslib.hardware.motors.MotorEx
+import com.seattlesolvers.solverslib.hardware.servos.ServoEx
 import kotlin.concurrent.Volatile
 
 object RobotHardware {
@@ -33,58 +31,44 @@ object RobotHardware {
 
     // State
     var alliance: Alliance = Alliance.RED
-    @Volatile
-    var DriverState: RobotStateEnum = RobotStateEnum.IDLE
-
 
     private fun setHardware() {
-        leftFront = MotorEx(
-            opMode.hardwareMap.get(
-                DcMotorEx::class.java,
-                "leftFrontDrive"
-            )
-        ).reversed()
-        leftBack = MotorEx(
-            opMode.hardwareMap.get(
-                DcMotorEx::class.java,
-                "leftBackDrive"
-            )
-        ).reversed()
-        rightFront =
-            MotorEx(opMode.hardwareMap.get(DcMotorEx::class.java, "rightFrontDrive"))
-        rightBack =
-            MotorEx(opMode.hardwareMap.get(DcMotorEx::class.java, "rightBackDrive"))
+        leftFront = MotorEx(opMode.hardwareMap, "leftFrontDrive").apply {
+            setInverted(true)
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
+        leftBack = MotorEx(opMode.hardwareMap, "leftBackDrive").apply {
+            setInverted(true)
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
+        rightFront = MotorEx(opMode.hardwareMap, "rightFrontDrive").apply {
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
+        rightBack = MotorEx(opMode.hardwareMap, "rightBackDrive").apply {
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
 
-        turretTurnMotor = MotorEx(
-            opMode.hardwareMap.get(
-                DcMotorEx::class.java,
-                "turretTurnMotor"
-            )
-        ).reversed()
-        turretShooterLeftMotor = MotorEx(
-            opMode.hardwareMap.get(
-                DcMotorEx::class.java,
-                "turretShooterLeftMotor"
-            )
-        ).reversed()
-        turretShooterRightMotor = MotorEx(
-            opMode.hardwareMap.get(
-                DcMotorEx::class.java,
-                "turretShooterRightMotor"
-            )
-        )
+        turretTurnMotor = MotorEx(opMode.hardwareMap, "turretTurnMotor").apply {
+            setInverted(true)
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
+        turretShooterLeftMotor = MotorEx(opMode.hardwareMap, "turretShooterLeftMotor").apply {
+            setInverted(true)
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
+        turretShooterRightMotor = MotorEx(opMode.hardwareMap, "turretShooterRightMotor")
 
-        kickerServo = ServoEx(opMode.hardwareMap.get(Servo::class.java, "kickerServo"))
+        kickerServo = ServoEx(opMode.hardwareMap, "kickerServo")
 
         limelight = opMode.hardwareMap.get(Limelight3A::class.java, "limelight")
     }
 
     private fun initHardware() {
-        SetPosition(kickerServo, 0.0)
+        kickerServo.set(1.0);
     }
 
-    fun init(OpModeInput: LinearOpMode, runtimeInput: ElapsedTime) {
-        opMode = OpModeInput
+    fun init(opModeInput: LinearOpMode, runtimeInput: ElapsedTime) {
+        opMode = opModeInput
         runtime = runtimeInput
         setHardware()
         initHardware()

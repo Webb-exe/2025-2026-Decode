@@ -1,51 +1,41 @@
 package teamcode.teleop
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
-import dev.nextftc.core.commands.conditionals.switchCommand
-import dev.nextftc.hardware.positionable.SetPosition
 import teamcode.robot.core.Alliance
 import teamcode.robot.core.RobotHardware
-import teamcode.robot.subsystems.Shooter
-import teamcode.robot.threads.InputThread
-import teamcode.robot.threads.MovementThread
-import teamcode.robot.threads.TurretThread
-import teamcode.robot.threads.VisionThread
+import teamcode.robot.core.state.RobotState
+import teamcode.robot.core.state.RobotStateMachine
+import teamcode.robot.subsystems.MovementSubsystem
+import teamcode.robot.subsystems.ShooterSubsystem
+import teamcode.robot.subsystems.TurretSubsystem
+import teamcode.robot.subsystems.VisionSubsystem
 import teamcode.threading.ThreadedOpMode
+import kotlin.math.max
 
 /**
- * Example usage of ThreadedOpMode.
- * This demonstrates how to use threading in your robot OpMode.
- * Remove @Disabled annotation to enable this OpMode.
+ * Main teleop OpMode.
+ * Clean architecture with automatic command scheduling.
  */
 @TeleOp(name = "Teleop", group = "Teleop")
 class Teleop : ThreadedOpMode() {
-    private lateinit var movementThread: MovementThread
-    private lateinit var turretThread: TurretThread
-    private lateinit var visionThread: VisionThread
-    private lateinit var inputThread: InputThread
-
-
-    override fun initializeThreads() {
-        // Create and configure threads
-        movementThread = MovementThread()
-        turretThread = TurretThread()
-        visionThread = VisionThread()
-        inputThread = InputThread()
-
-        // Add threads to manager
-        threadManager.addThread(movementThread)
-        threadManager.addThread(visionThread)
-        threadManager.addThread(turretThread)
-        threadManager.addThread(inputThread)
-    }
-
-    override fun runInit() {
+    
+    private lateinit var movement: MovementSubsystem
+    private lateinit var turret: TurretSubsystem
+    private lateinit var vision: VisionSubsystem
+    private lateinit var shooterSubsystem: ShooterSubsystem
+    
+    override fun initOpMode() {
+        movement = MovementSubsystem()
+        turret = TurretSubsystem()
+        vision = VisionSubsystem()
+        shooterSubsystem = ShooterSubsystem()
+        
+        // ===== INIT PHASE LOGIC =====
         var alliance = Alliance.RED
-
+        
         while (opModeInInit()) {
             telemetry.addData("Status", "In Init")
-
-
+            
             if (gamepad1.xWasPressed()) {
                 alliance = Alliance.BLUE
             }
@@ -54,76 +44,60 @@ class Teleop : ThreadedOpMode() {
             }
             telemetry.update()
         }
-
+        
         RobotHardware.alliance = alliance
     }
-
-    // State variables for button press detection
-    private var firstPressA = false
-    private var firstPressB = false
-    private var firstPressRightBumper = false
-    private var firstPressLeftBumper = false
-
+    
     override fun onStart() {
-        // Enable turret control when OpMode starts
-        turretThread.enable()
+        turret.enable()
+
     }
-
+    
     override fun mainLoop() {
-        // Main loop iteration - called repeatedly by ThreadedOpMode
-        // Telemetry staging and updates are handled automatically!
-
-        // ===== MOVEMENT CONTROL =====
-        // Update movement thread with gamepad1 input
-
-        movementThread.setDriveInput(gamepad1)
-        inputThread.updateGamepads(gamepad1,gamepad2)
+        movement.setDriveInput(gamepad1)
 
 
-        // Toggle precision mode with left trigger (reduces speed to 30%)
-        if (gamepad1.left_trigger > 0.5) {
-            movementThread.setSpeedMultiplier(0.3)
-        } else {
-            movementThread.setSpeedMultiplier(1.0)
-        }
+        when (RobotStateMachine.getState()){
+            RobotState.IDLE -> {
 
+            }
+            RobotState.SORTING -> {
+                // Driving is handled by default command
+            }
+            RobotState.SHOOTING -> {
+                // Shooting is handled by commands
+            }
+            RobotState.INTAKING -> {
 
-        // ===== TURRET CONTROL =====
-        // Turret automatically tracks targets using vision-based PID
-        firstPressA = gamepad1.a && !firstPressA
-        firstPressB = gamepad1.b && !firstPressB
-        firstPressRightBumper = gamepad1.right_bumper && !firstPressRightBumper
-        firstPressLeftBumper = gamepad1.left_bumper && !firstPressLeftBumper
+            }
 
-        if (firstPressA) {
-            turretThread.enable()
-        }
-
-        if (firstPressB) {
-            turretThread.disable()
 
         }
 
+        if (gamepad1Ex.){
+            var temp=max(RobotHardware.kickerServo.get()-0.1,0.0)
+            RobotHardware.kickerServo.set(temp)
 
+        }
 
+        if(gamepad1Ex.a.value){
+            RobotHardware.kickerServo.set(0.0)
+        }
 
-        telemetry.addData("Shooter Power", gamepad1.right_trigger)
+        if(gamepad1Ex.b.value){
+            RobotHardware.kickerServo.set(1.0)
+        }
+
 
         // ===== TELEMETRY =====
-        // Just use telemetry.addData() - namespace and updates are handled automatically!
-        telemetry.addData("Runtime", String.format("%.2f s", runtime!!.seconds()))
-        telemetry.addData("Loop Time", String.format("%.0f ms", runtime!!.milliseconds()))
-
-        telemetry.addData(
-            "Kicker Servo Pos",
-            String.format("%.2f", RobotHardware.kickerServo.position)
-        )
+        telemetry.addData("Servo", RobotHardware.kickerServo.get())
+        telemetry.addData("Robot State", getState().name)
+        telemetry.addData("Shooter Power", shooterSubsystem.getPower())
+        telemetry.addData("Runtime", String.format("%.2f s", runtime.seconds()))
     }
-
+    
     override fun cleanup() {
-        // Disable threads before stopping
-        movementThread.disable()
-        turretThread.disable()
+        movement.disable()
+        turret.disable()
     }
 }
-

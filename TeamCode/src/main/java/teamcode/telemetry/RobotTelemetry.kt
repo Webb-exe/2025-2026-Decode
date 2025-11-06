@@ -96,7 +96,8 @@ class RobotTelemetry(
      */
     fun addData(key: String, format: String, vararg args: Any?) {
         val value = String.format(format, *args)
-        addData(key, value)
+        // Explicitly call the (String, Any) overload to avoid ambiguity with (String, String, vararg)
+        addData(key, value as Any)
     }
 
     /**
