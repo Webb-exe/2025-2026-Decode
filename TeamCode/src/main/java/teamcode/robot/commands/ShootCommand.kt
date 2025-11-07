@@ -5,6 +5,9 @@ import teamcode.robot.subsystems.ShooterSubsystem
 
 /**
  * Command to shoot at a specific power for a duration.
+ * 
+ * Dependencies are automatically detected from constructor parameters.
+ * The shooterSubsystem parameter is automatically added as a requirement - no init block needed!
  */
 class ShootCommand(
     private val shooterSubsystem: ShooterSubsystem,
@@ -14,12 +17,11 @@ class ShootCommand(
     
     private var startTime: Long = 0
     
-    init {
-        addRequirement(shooterSubsystem)
-    }
+    // No init block needed! shooterSubsystem is automatically detected and registered
     
     override fun initialize() {
         startTime = System.currentTimeMillis()
+        // Access dependency directly via property name
         shooterSubsystem.setPower(power)
     }
     

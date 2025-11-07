@@ -23,6 +23,9 @@ object RobotHardware {
     lateinit var turretShooterLeftMotor: MotorEx
     lateinit var turretShooterRightMotor: MotorEx
 
+    // Spindexter
+    lateinit var spindexterMotor: MotorEx
+
     // Servo
     lateinit var kickerServo: ServoEx
 
@@ -57,6 +60,10 @@ object RobotHardware {
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
         }
         turretShooterRightMotor = MotorEx(opMode.hardwareMap, "turretShooterRightMotor")
+
+        spindexterMotor = MotorEx(opMode.hardwareMap, "spindexterMotor").apply {
+            setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+        }
 
         kickerServo = ServoEx(opMode.hardwareMap, "kickerServo")
 

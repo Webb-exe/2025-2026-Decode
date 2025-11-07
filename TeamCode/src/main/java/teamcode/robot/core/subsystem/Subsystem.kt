@@ -51,6 +51,11 @@ abstract class Subsystem(
     internal fun setCommand(command: teamcode.robot.command.Command?) {
         synchronized(this) {
             val previousCommand = currentCommand
+            // Only set new command if previous command is not non-interruptible
+            if (previousCommand != null && previousCommand.nonInterruptible && command != null) {
+                // Cannot replace non-interruptible command
+                return
+            }
             currentCommand = command
             command?.let { it.setSubsystem(this) }
             

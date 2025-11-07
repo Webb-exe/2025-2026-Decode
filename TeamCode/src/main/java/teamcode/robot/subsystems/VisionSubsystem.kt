@@ -35,11 +35,10 @@ class VisionSubsystem : Subsystem("Vision", 100) {
     class AprilTag(val id: Int, val yDegrees: Double, val xDegrees: Double)
     
     override fun init() {
-        RobotHardware.limelight?.start()
+        RobotHardware.limelight.start()
     }
     
     override fun periodic() {
-        if (RobotHardware.limelight == null) return
         
         try {
             val result = RobotHardware.limelight.getLatestResult()

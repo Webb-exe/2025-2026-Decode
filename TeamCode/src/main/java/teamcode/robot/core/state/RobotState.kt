@@ -12,7 +12,6 @@ enum class RobotState {
     IDLE,
     INTAKING,
     SHOOTING,
-    SORTING,
 }
 
 /**

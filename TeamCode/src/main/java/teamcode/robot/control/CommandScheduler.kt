@@ -61,6 +61,13 @@ class CommandScheduler(
         synchronized(this) {
             val conflicts = findConflicts(command)
             
+            // Check if any conflicts are non-interruptible
+            val nonInterruptibleConflicts = conflicts.filter { it.nonInterruptible }
+            if (nonInterruptibleConflicts.isNotEmpty()) {
+                // Cannot schedule if there are non-interruptible conflicts
+                return false
+            }
+            
             if (conflicts.isEmpty()) {
                 scheduleCommand(command)
                 return true
@@ -95,7 +102,9 @@ class CommandScheduler(
      */
     fun cancel(command: Command) {
         synchronized(this) {
-            command.cancel()
+            if (!command.nonInterruptible) {
+                command.cancel()
+            }
         }
     }
     
@@ -104,10 +113,25 @@ class CommandScheduler(
      */
     fun cancelAll(subsystem: Subsystem) {
         synchronized(this) {
-            scheduledCommands[subsystem]?.cancel()
-            scheduledCommands.remove(subsystem)
+            scheduledCommands[subsystem]?.let { cmd ->
+                if (!cmd.nonInterruptible) {
+                    // Cancel the command (this will mark it as finished)
+                    cmd.cancel()
+                    
+                    // Clear the command from all subsystems it was scheduled on
+                    val subsystemsToClear = scheduledCommands.filter { (_, scheduledCmd) -> scheduledCmd == cmd }
+                        .keys
+                    
+                    subsystemsToClear.forEach { sub ->
+                        sub.clearCommand()
+                        scheduledCommands.remove(sub)
+                    }
+                }
+            }
             
-            defaultCommands[subsystem]?.let { scheduleCommand(it) }
+            if (!scheduledCommands.containsKey(subsystem)) {
+                defaultCommands[subsystem]?.let { scheduleCommand(it) }
+            }
         }
     }
     
@@ -116,10 +140,29 @@ class CommandScheduler(
      */
     fun cancelAll() {
         synchronized(this) {
-            scheduledCommands.values.forEach { it.cancel() }
-            scheduledCommands.clear()
+            // Get all unique commands (a command may be on multiple subsystems)
+            val allCommands = scheduledCommands.values.distinct()
             
-            defaultCommands.forEach { (_, cmd) -> scheduleCommand(cmd) }
+            allCommands.forEach { cmd ->
+                if (!cmd.nonInterruptible) {
+                    cmd.cancel()
+                }
+            }
+            
+            // Clear all non-interruptible commands from all subsystems
+            scheduledCommands.entries.removeAll { (_, cmd) -> !cmd.nonInterruptible }
+            
+            // Clear commands from subsystems
+            scheduledCommands.keys.forEach { subsystem ->
+                subsystem.clearCommand()
+            }
+            
+            // Restore default commands
+            defaultCommands.forEach { (subsystem, cmd) ->
+                if (!scheduledCommands.containsKey(subsystem)) {
+                    scheduleCommand(cmd)
+                }
+            }
         }
     }
     
@@ -162,15 +205,25 @@ class CommandScheduler(
         
         synchronized(this) {
             // Remove finished commands
-            val finished = scheduledCommands.filter { (_, cmd) -> !cmd.isScheduled() }
+            // Find all unique finished commands (a command may be on multiple subsystems)
+            val finishedCommands = scheduledCommands.values
+                .filter { !it.isScheduled() }
+                .distinct()
             
-            finished.forEach { (subsystem, _) ->
-                subsystem.clearCommand()
-                scheduledCommands.remove(subsystem)
+            // For each finished command, clear it from all subsystems
+            finishedCommands.forEach { cmd ->
+                val subsystemsToClear = scheduledCommands.filter { (_, scheduledCmd) -> scheduledCmd == cmd }
+                    .keys
                 
-                defaultCommands[subsystem]?.let { cmd ->
-                    if (!cmd.isScheduled()) {
-                        scheduleCommand(cmd)
+                subsystemsToClear.forEach { subsystem ->
+                    subsystem.clearCommand()
+                    scheduledCommands.remove(subsystem)
+                    
+                    // Restore default command if available
+                    defaultCommands[subsystem]?.let { defaultCmd ->
+                        if (!defaultCmd.isScheduled()) {
+                            scheduleCommand(defaultCmd)
+                        }
                     }
                 }
             }
@@ -202,13 +255,23 @@ class CommandScheduler(
     }
     
     private fun scheduleCommand(command: Command) {
+        // Re-detect dependencies if command has no requirements yet (fallback)
+        if (command.getRequirements().isEmpty()) {
+            command.reDetectDependencies()
+        }
+        
         val requirements = command.getRequirements()
         if (requirements.isEmpty()) return
         
         command.start()
-        val primarySubsystem = requirements.first()
-        primarySubsystem.setCommand(command)
-        scheduledCommands[primarySubsystem] = command
+        
+        // Set the command on ALL required subsystems, not just the first one
+        // This allows the command to run on all subsystem threads
+        requirements.forEach { subsystem ->
+            subsystem.setCommand(command)
+            scheduledCommands[subsystem] = command
+        }
+        
         commandQueue.remove(command)
     }
     

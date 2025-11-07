@@ -40,7 +40,7 @@ class RobotTelemetry(
      */
     // PanelsTelemetry integration (optional)
     val panelsTelemetry: PanelsTelemetry = PanelsTelemetry
-    private var usePanelsTelemetry = false
+    private var usePanelsTelemetry = true
 
     // Current namespace for thread-local operations
     private val currentNamespace: ThreadLocal<String> =

@@ -59,33 +59,51 @@ class Teleop : ThreadedOpMode() {
 
         when (RobotStateMachine.getState()){
             RobotState.IDLE -> {
-
-            }
-            RobotState.SORTING -> {
-                // Driving is handled by default command
+                if (gamepad1Ex.rightTrigger.value>0.5){
+                    RobotStateMachine.transitionTo(RobotState.INTAKING)
+                }
             }
             RobotState.SHOOTING -> {
-                // Shooting is handled by commands
+                if (!gamepad1Ex.rightBumper.value){
+                    RobotStateMachine.transitionTo(RobotState.IDLE);
+                }
+            }
+            RobotState.SORTING -> {
+                if (gamepad1Ex.rightBumper.value){
+                    RobotStateMachine.transitionTo(RobotState.SHOOTING)
+                }
+                if(gamepad1Ex.leftBumper.value){
+
+                }
             }
             RobotState.INTAKING -> {
-
+                if (gamepad1Ex.rightTrigger.value<=0.5){
+                    RobotStateMachine.transitionTo(RobotState.SORTING)
+                }
             }
 
 
         }
 
-        if (gamepad1Ex.){
+
+
+        if (gamepad1Ex.a.wasPressed()){
             var temp=max(RobotHardware.kickerServo.get()-0.1,0.0)
             RobotHardware.kickerServo.set(temp)
 
         }
-
-        if(gamepad1Ex.a.value){
-            RobotHardware.kickerServo.set(0.0)
-        }
-
         if(gamepad1Ex.b.value){
             RobotHardware.kickerServo.set(1.0)
+        }
+
+        if (gamepad1Ex.rightTrigger.value != 0.0){
+            RobotHardware.spindexterMotor.set(gamepad1Ex.rightTrigger.value);
+        }
+        else if (gamepad1Ex.leftTrigger.value != 0.0){
+            RobotHardware.spindexterMotor.set(-gamepad1Ex.leftTrigger.value);
+        }
+        else{
+            RobotHardware.spindexterMotor.set(0.0);
         }
 
 
