@@ -3,7 +3,6 @@ package teamcode.robot.subsystems
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.Gamepad
 import dev.nextftc.hardware.powerable.SetPower
-import teamcode.robot.core.RobotConfig
 import teamcode.robot.core.RobotHardware
 import teamcode.robot.core.subsystem.Subsystem
 import kotlin.concurrent.Volatile
@@ -16,6 +15,13 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.withSign
+
+object MovementConfig{
+    @JvmField
+    var TurnScale: Double = 0.5
+    @JvmField
+    var PowerScale: Double = 0.5
+}
 
 /**
  * Movement subsystem for mecanum drive.
@@ -108,9 +114,9 @@ class MovementSubsystem : Subsystem("Movement", 5) {
             y = temp
         }
         
-        val turn = rot * RobotConfig.TurnScale
+        val turn = rot * MovementConfig.TurnScale
         val theta = atan2(y, x)
-        val power = hypot(x, y) * RobotConfig.PowerScale
+        val power = hypot(x, y) * MovementConfig.PowerScale
         
         val sin = sin(theta - Math.PI / 4)
         val cos = cos(theta - Math.PI / 4)

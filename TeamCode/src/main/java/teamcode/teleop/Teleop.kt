@@ -5,12 +5,16 @@ import teamcode.robot.core.Alliance
 import teamcode.robot.core.RobotHardware
 import teamcode.robot.core.state.RobotState
 import teamcode.robot.core.state.RobotStateMachine
+import teamcode.robot.subsystems.IntakeSubsystem
 import teamcode.robot.subsystems.MovementSubsystem
+import teamcode.robot.subsystems.ShooterState
 import teamcode.robot.subsystems.ShooterSubsystem
+import teamcode.robot.subsystems.SpindexerSubsystem
+import teamcode.robot.subsystems.TurretState
 import teamcode.robot.subsystems.TurretSubsystem
 import teamcode.robot.subsystems.VisionSubsystem
 import teamcode.threading.ThreadedOpMode
-import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Main teleop OpMode.
@@ -19,16 +23,21 @@ import kotlin.math.max
 @TeleOp(name = "Teleop", group = "Teleop")
 class Teleop : ThreadedOpMode() {
     
-    private lateinit var movement: MovementSubsystem
-    private lateinit var turret: TurretSubsystem
-    private lateinit var vision: VisionSubsystem
+    private lateinit var movementSubsystem: MovementSubsystem
+    private lateinit var turretSubsystem: TurretSubsystem
+    private lateinit var visionSubsystem: VisionSubsystem
     private lateinit var shooterSubsystem: ShooterSubsystem
+    private lateinit var spindexerSubsystem: SpindexerSubsystem
+    private lateinit var intakeSubsystem: IntakeSubsystem
+    private var lastA = false
     
     override fun initOpMode() {
-        movement = MovementSubsystem()
-        turret = TurretSubsystem()
-        vision = VisionSubsystem()
+        movementSubsystem = MovementSubsystem()
+        turretSubsystem = TurretSubsystem()
+        visionSubsystem = VisionSubsystem()
         shooterSubsystem = ShooterSubsystem()
+        spindexerSubsystem = SpindexerSubsystem()
+        intakeSubsystem = IntakeSubsystem()
         
         // ===== INIT PHASE LOGIC =====
         var alliance = Alliance.RED
@@ -49,73 +58,77 @@ class Teleop : ThreadedOpMode() {
     }
     
     override fun onStart() {
-        turret.enable()
-
+        turretSubsystem.enable()
+        turretSubsystem.enterManualMode()
     }
     
     override fun mainLoop() {
-        movement.setDriveInput(gamepad1)
-
-
         when (RobotStateMachine.getState()){
             RobotState.IDLE -> {
-                if (gamepad1Ex.rightTrigger.value>0.5){
-                    RobotStateMachine.transitionTo(RobotState.INTAKING)
+                if (gamepad2Ex.rightTrigger.value>0.05){
+                    RobotStateMachine.transitionTo(RobotState.SHOOTING)
                 }
             }
             RobotState.SHOOTING -> {
-                if (!gamepad1Ex.rightBumper.value){
-                    RobotStateMachine.transitionTo(RobotState.IDLE);
+                if (gamepad2Ex.rightTrigger.value<0.05 && shooterSubsystem.currentState==ShooterState.IDLE){
+                    RobotStateMachine.transitionTo(RobotState.IDLE)
+                    return
                 }
-            }
-            RobotState.SORTING -> {
-                if (gamepad1Ex.rightBumper.value){
-                    RobotStateMachine.transitionTo(RobotState.SHOOTING)
-                }
-                if(gamepad1Ex.leftBumper.value){
-
+                if (gamepad2Ex.b.wasPressed()){
+                    shooterSubsystem.triggerKicker()
                 }
             }
             RobotState.INTAKING -> {
-                if (gamepad1Ex.rightTrigger.value<=0.5){
-                    RobotStateMachine.transitionTo(RobotState.SORTING)
-                }
+
             }
 
 
         }
 
-
-
-        if (gamepad1Ex.a.wasPressed()){
-            var temp=max(RobotHardware.kickerServo.get()-0.1,0.0)
-            RobotHardware.kickerServo.set(temp)
-
-        }
-        if(gamepad1Ex.b.value){
-            RobotHardware.kickerServo.set(1.0)
+        if (gamepad2Ex.a.wasPressed()){
+            spindexerSubsystem.changeTargetPositionByOffset(1)
         }
 
-        if (gamepad1Ex.rightTrigger.value != 0.0){
-            RobotHardware.spindexterMotor.set(gamepad1Ex.rightTrigger.value);
+//        if (gamepad2Ex.rightBumper.wasPressed()){
+//            turretSubsystem.triggerStates()
+//        }
+
+        if (turretSubsystem.currentState== TurretState.MANUAL){
+            if (gamepad2Ex.rightBumper.value){
+                turretSubsystem.setManualTurnSpeed(1.0)
+            } else if(gamepad2Ex.leftBumper.value){
+                turretSubsystem.setManualTurnSpeed(-1.0)
+            }else{
+                turretSubsystem.setManualTurnSpeed(0.0)
+            }
         }
-        else if (gamepad1Ex.leftTrigger.value != 0.0){
-            RobotHardware.spindexterMotor.set(-gamepad1Ex.leftTrigger.value);
-        }
-        else{
-            RobotHardware.spindexterMotor.set(0.0);
-        }
+
+        movementSubsystem.setDriveInput(gamepad1)
+
+
+//        RobotHardware.kickerServo.set(gamepad1Ex.leftTrigger.value)
+//        if (gamepad1Ex.rightTrigger.value != 0.0){
+//            RobotHardware.spindexterMotor.set(gamepad1Ex.rightTrigger.value);
+//        }
+//        else if (gamepad1Ex.leftTrigger.value != 0.0){
+//            RobotHardware.spindexterMotor.set(-gamepad1Ex.leftTrigger.value);
+//        }
+//        else{
+//            RobotHardware.spindexterMotor.set(0.0);
+//        }
+
+//        spindexerSubsystem.updateGamepad(gamepad1Ex.leftTrigger.value,gamepad1Ex.rightTrigger.value)
+
+
 
 
         // ===== TELEMETRY =====
-        telemetry.addData("Servo", RobotHardware.kickerServo.get())
-        telemetry.addData("Robot State", getState().name)
-        telemetry.addData("Shooter Power", shooterSubsystem.getPower())
-        telemetry.addData("Runtime", String.format("%.2f s", runtime.seconds()))
+        robotTelemetry.addData("Robot State", getState().name)
+        robotTelemetry.addData("Runtime", String.format("%.2f s", runtime.seconds()))
     }
     
     override fun cleanup() {
-        movement.disable()
-        turret.disable()
+        movementSubsystem.disable()
+        turretSubsystem.disable()
     }
 }

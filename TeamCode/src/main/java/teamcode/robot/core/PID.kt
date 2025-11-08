@@ -14,7 +14,14 @@ import kotlin.math.max
  * - Optional derivative filtering
  * - Optional output clamp
  * - Continuous input mode for wrap-around signals (e.g., heading 0..360)
+ * - Direction restriction for continuous inputs (positive or negative only)
  */
+enum class ContinuousDirection {
+    NONE,           // Allow both directions (default)
+    POSITIVE_ONLY,  // Only allow positive error/output (increase only)
+    NEGATIVE_ONLY   // Only allow negative error/output (decrease only)
+}
+
 class PID(kP: Double, kI: Double, kD: Double) {
     // ----- Optional getters for telemetry -----
     // Gains
@@ -53,11 +60,16 @@ class PID(kP: Double, kI: Double, kD: Double) {
     private var continuous = false
     private var minInput = 0.0
     private var maxInput = 360.0
+    private var continuousDirection = ContinuousDirection.NONE
+    private var reverseThreshold = 0.0 // Allow reverse if error < this threshold
 
     // Tolerance for atSetpoint()
     private var positionTolerance = 0.0
     private var velocityTolerance =
         Double.Companion.POSITIVE_INFINITY // optionally check derivative too
+
+    // Acceptable error for isAtPosition() (default 0.0 means never at position)
+    private var acceptableError = 0.0
 
     private var scaleFactor = 1.0
 
@@ -109,6 +121,21 @@ class PID(kP: Double, kI: Double, kD: Double) {
         this.continuous = false
     }
 
+    /**
+     * Set direction restriction for continuous inputs.
+     * When enabled, the PID will only move in the specified direction (positive or negative).
+     * This forces the controller to take the longer path if needed to maintain direction.
+     * Only applies when continuous input is enabled.
+     * @param direction POSITIVE_ONLY, NEGATIVE_ONLY, or NONE (default)
+     * @param reverseThreshold If the absolute error in the opposite direction is less than this value,
+     *                         allow going in the opposite direction (default: 0.0 = never allow reverse)
+     */
+    fun setContinuousDirection(direction: ContinuousDirection, reverseThreshold: Double = 0.0) {
+        require(reverseThreshold >= 0.0) { "reverseThreshold must be >= 0" }
+        this.continuousDirection = direction
+        this.reverseThreshold = reverseThreshold
+    }
+
     /** Set tolerances for atSetpoint(). Velocity tolerance is optional.  */
     fun setTolerance(positionTolerance: Double, velocityTolerance: Double) {
         this.positionTolerance = max(0.0, positionTolerance)
@@ -117,6 +144,26 @@ class PID(kP: Double, kI: Double, kD: Double) {
 
     fun setTolerance(positionTolerance: Double) {
         setTolerance(positionTolerance, Double.Companion.POSITIVE_INFINITY)
+    }
+
+    /**
+     * Set the acceptable error threshold for isAtPosition().
+     * When the absolute error is less than or equal to this value, isAtPosition() returns true.
+     * Default is 0.0, meaning isAtPosition() will never return true unless explicitly set.
+     * @param acceptableError Maximum acceptable absolute error (must be >= 0)
+     */
+    fun setAcceptableError(acceptableError: Double) {
+        require(acceptableError >= 0.0) { "acceptableError must be >= 0" }
+        this.acceptableError = acceptableError
+    }
+
+    /**
+     * Check if the PID controller is at position based on the current error.
+     * Returns true if the absolute error is within the acceptable error threshold.
+     * @return true if abs(error) <= acceptableError
+     */
+    fun isAtPosition(): Boolean {
+        return abs(this.error) <= acceptableError
     }
 
     /**
@@ -165,8 +212,25 @@ class PID(kP: Double, kI: Double, kD: Double) {
             this.error = getError(setpoint, measurement)
             this.derivative = 0.0
             // No integral or derivative on first pass
-            val output = kP * this.error
-            return clamp(output * scaleFactor, outputMin, outputMax)
+            var output = kP * this.error * scaleFactor
+            
+            // Apply direction restriction to output if continuous input is enabled
+            // Allow reverse if within threshold
+            if (continuous) {
+                when (continuousDirection) {
+                    ContinuousDirection.POSITIVE_ONLY -> {
+                        if (!allowingReverse && output < 0.0) output = 0.0
+                    }
+                    ContinuousDirection.NEGATIVE_ONLY -> {
+                        if (!allowingReverse && output > 0.0) output = 0.0
+                    }
+                    ContinuousDirection.NONE -> {
+                        // No restriction
+                    }
+                }
+            }
+            
+            return clamp(output, outputMin, outputMax)
         }
 
         return calculateWithDt(measurement, dt)
@@ -185,8 +249,25 @@ class PID(kP: Double, kI: Double, kD: Double) {
         if (dtSec <= 0.0) {
             // For zero or negative dt, just return proportional term without updating state
             val error = getError(setpoint, measurement)
-            val output = kP * error
-            return clamp(output * scaleFactor, outputMin, outputMax)
+            var output = kP * error * scaleFactor
+            
+            // Apply direction restriction to output if continuous input is enabled
+            // Allow reverse if within threshold
+            if (continuous) {
+                when (continuousDirection) {
+                    ContinuousDirection.POSITIVE_ONLY -> {
+                        if (!allowingReverse && output < 0.0) output = 0.0
+                    }
+                    ContinuousDirection.NEGATIVE_ONLY -> {
+                        if (!allowingReverse && output > 0.0) output = 0.0
+                    }
+                    ContinuousDirection.NONE -> {
+                        // No restriction
+                    }
+                }
+            }
+            
+            return clamp(output, outputMin, outputMax)
         }
 
         return calculateWithDt(measurement, dtSec)
@@ -236,8 +317,34 @@ class PID(kP: Double, kI: Double, kD: Double) {
 
         // If saturated and anti-windup enabled, don't update integral
 
+        // Apply direction restriction to output if continuous input is enabled
+        // The error has already been adjusted to the preferred direction, so output should match
+        // Unless we're allowing reverse (within threshold)
+        var finalOutput = outputBeforeClamp
+        if (continuous) {
+            when (continuousDirection) {
+                ContinuousDirection.POSITIVE_ONLY -> {
+                    // If allowing reverse (small error), allow negative output
+                    // Otherwise, clamp negative outputs to 0 to ensure we only move forward
+                    if (!allowingReverse && finalOutput < 0.0) {
+                        finalOutput = 0.0
+                    }
+                }
+                ContinuousDirection.NEGATIVE_ONLY -> {
+                    // If allowing reverse (small error), allow positive output
+                    // Otherwise, clamp positive outputs to 0 to ensure we only move backward
+                    if (!allowingReverse && finalOutput > 0.0) {
+                        finalOutput = 0.0
+                    }
+                }
+                ContinuousDirection.NONE -> {
+                    // No restriction
+                }
+            }
+        }
+        
         // Final output with clamp
-        val output: Double = clamp(outputBeforeClamp, outputMin, outputMax)
+        val output: Double = clamp(finalOutput, outputMin, outputMax)
         return output
     }
 
@@ -253,13 +360,68 @@ class PID(kP: Double, kI: Double, kD: Double) {
         return posErr <= positionTolerance
     }
 
+    // Track if we're allowing reverse (for output restriction)
+    private var allowingReverse = false
+    
     // ----- Helpers -----
     private fun getError(target: Double, measurement: Double): Double {
         var error = target - measurement
+        allowingReverse = false
+        
         if (continuous) {
             val range = maxInput - minInput
-            // Wrap error into (-range/2, +range/2]
-            error = wrap(error, -range / 2.0, range / 2.0)
+            // Wrap error into (-range/2, +range/2] to find shortest path
+            var wrappedError = wrap(error, -range / 2.0, range / 2.0)
+            
+            // Apply direction restriction for continuous inputs
+            // If target is in opposite direction, go the long way around
+            // Unless the error is small enough (within reverseThreshold)
+            when (continuousDirection) {
+                ContinuousDirection.POSITIVE_ONLY -> {
+                    if (wrappedError < 0.0) {
+                        // Target is behind us
+                        val absWrappedError = abs(wrappedError)
+                        if (reverseThreshold > 0.0 && absWrappedError <= reverseThreshold) {
+                            // Error is small enough, allow going backward
+                            error = wrappedError
+                            allowingReverse = true
+                        } else {
+                            // Go forward the long way
+                            error = wrappedError + range
+                        }
+                    } else if (wrappedError == 0.0) {
+                        // Already at target
+                        error = 0.0
+                    } else {
+                        // Target is ahead, use normal error
+                        error = wrappedError
+                    }
+                }
+                ContinuousDirection.NEGATIVE_ONLY -> {
+                    if (wrappedError > 0.0) {
+                        // Target is ahead of us
+                        val absWrappedError = abs(wrappedError)
+                        if (reverseThreshold > 0.0 && absWrappedError <= reverseThreshold) {
+                            // Error is small enough, allow going forward
+                            error = wrappedError
+                            allowingReverse = true
+                        } else {
+                            // Go backward the long way
+                            error = wrappedError - range
+                        }
+                    } else if (wrappedError == 0.0) {
+                        // Already at target
+                        error = 0.0
+                    } else {
+                        // Target is behind, use normal error
+                        error = wrappedError
+                    }
+                }
+                ContinuousDirection.NONE -> {
+                    // No restriction, use shortest path
+                    error = wrappedError
+                }
+            }
         }
         return error
     }

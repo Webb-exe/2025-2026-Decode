@@ -18,6 +18,23 @@ class GamepadEx(
     private val gamepad: Gamepad
 ) {
     private val buttonBindingMap = mutableMapOf<String, AutoBinding?>()
+    
+    // Cache button triggers to preserve state between calls
+    private val _a = ButtonTrigger("a") { gamepad.a }
+    private val _b = ButtonTrigger("b") { gamepad.b }
+    private val _x = ButtonTrigger("x") { gamepad.x }
+    private val _y = ButtonTrigger("y") { gamepad.y }
+    private val _leftBumper = ButtonTrigger("leftBumper") { gamepad.left_bumper }
+    private val _rightBumper = ButtonTrigger("rightBumper") { gamepad.right_bumper }
+    private val _dpadUp = ButtonTrigger("dpadUp") { gamepad.dpad_up }
+    private val _dpadDown = ButtonTrigger("dpadDown") { gamepad.dpad_down }
+    private val _dpadLeft = ButtonTrigger("dpadLeft") { gamepad.dpad_left }
+    private val _dpadRight = ButtonTrigger("dpadRight") { gamepad.dpad_right }
+    private val _back = ButtonTrigger("back") { gamepad.back }
+    private val _guide = ButtonTrigger("guide") { gamepad.guide }
+    private val _start = ButtonTrigger("start") { gamepad.start }
+    private val _leftTrigger = TriggerBinding("leftTrigger", { gamepad.left_trigger.toDouble() })
+    private val _rightTrigger = TriggerBinding("rightTrigger", { gamepad.right_trigger.toDouble() })
 
     /**
      * Get the underlying gamepad object for direct access to raw properties.
@@ -291,49 +308,49 @@ class GamepadEx(
 
     // Button triggers - primary API for bindings
     val a: ButtonTrigger
-        get() = ButtonTrigger("a") { gamepad.a }
+        get() = _a
 
     val b: ButtonTrigger
-        get() = ButtonTrigger("b") { gamepad.b }
+        get() = _b
 
     val x: ButtonTrigger
-        get() = ButtonTrigger("x") { gamepad.x }
+        get() = _x
 
     val y: ButtonTrigger
-        get() = ButtonTrigger("y") { gamepad.y }
+        get() = _y
 
     val leftBumper: ButtonTrigger
-        get() = ButtonTrigger("leftBumper") { gamepad.left_bumper }
+        get() = _leftBumper
 
     val rightBumper: ButtonTrigger
-        get() = ButtonTrigger("rightBumper") { gamepad.right_bumper }
+        get() = _rightBumper
 
     val dpadUp: ButtonTrigger
-        get() = ButtonTrigger("dpadUp") { gamepad.dpad_up }
+        get() = _dpadUp
 
     val dpadDown: ButtonTrigger
-        get() = ButtonTrigger("dpadDown") { gamepad.dpad_down }
+        get() = _dpadDown
 
     val dpadLeft: ButtonTrigger
-        get() = ButtonTrigger("dpadLeft") { gamepad.dpad_left }
+        get() = _dpadLeft
 
     val dpadRight: ButtonTrigger
-        get() = ButtonTrigger("dpadRight") { gamepad.dpad_right }
+        get() = _dpadRight
 
     val back: ButtonTrigger
-        get() = ButtonTrigger("back") { gamepad.back }
+        get() = _back
 
     val guide: ButtonTrigger
-        get() = ButtonTrigger("guide") { gamepad.guide }
+        get() = _guide
 
     val start: ButtonTrigger
-        get() = ButtonTrigger("start") { gamepad.start }
+        get() = _start
 
     // Trigger bindings
     val leftTrigger: TriggerBinding
-        get() = TriggerBinding("leftTrigger", { gamepad.left_trigger.toDouble() })
+        get() = _leftTrigger
 
     val rightTrigger: TriggerBinding
-        get() = TriggerBinding("rightTrigger", { gamepad.right_trigger.toDouble() })
+        get() = _rightTrigger
 }
 

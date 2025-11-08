@@ -30,7 +30,7 @@ abstract class ThreadedOpMode : LinearOpMode() {
     protected lateinit var runtime: ElapsedTime
 
     // Unified telemetry system - use this everywhere!
-    protected lateinit var telemetry: RobotTelemetry
+    protected lateinit var robotTelemetry: RobotTelemetry
     
     /**
      * Command scheduler for managing commands.
@@ -46,11 +46,26 @@ abstract class ThreadedOpMode : LinearOpMode() {
         protected set
     
     /**
+     * Override parent's telemetry property to return ftcTelemetry.
+     * This maintains compatibility with code expecting Telemetry type.
+     * Use robotTelemetry for RobotTelemetry-specific functionality.
+     * 
+     * Note: This override prevents smart cast issues by ensuring telemetry
+     * has a single, well-defined type (Telemetry) rather than being shadowed.
+     */
+     var telemetry: Telemetry
+        get() = ftcTelemetry ?: error("Telemetry not initialized")
+        set(value) {
+            ftcTelemetry = value
+        }
+    
+    /**
      * Gamepad 1 - extended gamepad with binding functionality.
      * Wraps the standard FTC gamepad1 and adds command binding capabilities.
      * Use this in initOpMode() and other methods to create gamepad bindings.
      */
     protected val gamepad1Ex: GamepadEx by lazy { GamepadEx(super.gamepad1) }
+
     
     /**
      * Gamepad 2 - extended gamepad with binding functionality.
@@ -68,6 +83,42 @@ abstract class ThreadedOpMode : LinearOpMode() {
         private var currentInstance: ThreadedOpMode? = null
         
         /**
+         * Global gamepad1Ex instance - accessible from anywhere.
+         * Thread-safe access.
+         */
+        @Volatile
+        private var globalGamepad1Ex: GamepadEx? = null
+        
+        /**
+         * Global gamepad2Ex instance - accessible from anywhere.
+         * Thread-safe access.
+         */
+        @Volatile
+        private var globalGamepad2Ex: GamepadEx? = null
+        
+        /**
+         * Get the global gamepad1Ex instance.
+         * @return The GamepadEx instance for gamepad1
+         * @throws IllegalStateException if the OpMode is not running
+         */
+        @JvmStatic
+        @JvmName("getGlobalGamepad1Ex")
+        fun getGamepad1Ex(): GamepadEx {
+            return globalGamepad1Ex ?: error("Gamepad1Ex is not available. OpMode may not be running.")
+        }
+        
+        /**
+         * Get the global gamepad2Ex instance.
+         * @return The GamepadEx instance for gamepad2
+         * @throws IllegalStateException if the OpMode is not running
+         */
+        @JvmStatic
+        @JvmName("getGlobalGamepad2Ex")
+        fun getGamepad2Ex(): GamepadEx {
+            return globalGamepad2Ex ?: error("Gamepad2Ex is not available. OpMode may not be running.")
+        }
+        
+        /**
          * Register a subsystem/thread to be automatically added to the thread manager.
          * Called automatically by Subsystem constructor.
          */
@@ -80,6 +131,14 @@ abstract class ThreadedOpMode : LinearOpMode() {
          */
         internal fun setCurrentInstance(instance: ThreadedOpMode?) {
             currentInstance = instance
+            // Update global gamepads when instance changes
+            if (instance != null) {
+                globalGamepad1Ex = instance.gamepad1Ex
+                globalGamepad2Ex = instance.gamepad2Ex
+            } else {
+                globalGamepad1Ex = null
+                globalGamepad2Ex = null
+            }
         }
     }
 
@@ -87,7 +146,13 @@ abstract class ThreadedOpMode : LinearOpMode() {
         runtime = ElapsedTime()
         threadManager = ThreadManager()
         
+        // Initialize gamepads (lazy properties) before setting as global
+        // Access them to trigger lazy initialization
+        val unused1 = gamepad1Ex
+        val unused2 = gamepad2Ex
+        
         // Set current instance for auto-registration (after threadManager is created)
+        // This will also set the global gamepads
         setCurrentInstance(this)
 
 
@@ -96,8 +161,8 @@ abstract class ThreadedOpMode : LinearOpMode() {
 
 
         // Create unified telemetry system
-        telemetry = RobotTelemetry(ftcTelemetry)
-        telemetry.namespace = "Main"
+        robotTelemetry = RobotTelemetry(ftcTelemetry)
+        robotTelemetry.namespace = "Main"
 
 
         // Initialize robot hardware
@@ -111,7 +176,7 @@ abstract class ThreadedOpMode : LinearOpMode() {
         // Create and initialize command scheduler
         commandScheduler = CommandScheduler(20)
         threadManager.addThread(commandScheduler)
-        commandScheduler.telemetry = telemetry
+        commandScheduler.telemetry = robotTelemetry
         CommandScheduler.register(commandScheduler)
         
         // Automatically initialize StateDefaultCommands
@@ -119,11 +184,11 @@ abstract class ThreadedOpMode : LinearOpMode() {
 
         // Set telemetry for all threads
         for (thread in threadManager.getThreads()) {
-            thread?.telemetry = telemetry
+            thread?.telemetry = robotTelemetry
         }
 
-        telemetry.addData("Status", "Initialized")
-        telemetry.update()
+        robotTelemetry.addData("Status", "Initialized")
+        robotTelemetry.update()
 
 
         // Wait for the game to start (driver presses PLAY)
@@ -142,8 +207,8 @@ abstract class ThreadedOpMode : LinearOpMode() {
             // Run the main opmode loop with automatic telemetry staging
             while (opModeIsActive()) {
                 // Use atomic staging pattern (same as threads) to prevent flickering
-                telemetry.namespace = "Main"
-                telemetry.beginStaging()
+                robotTelemetry.namespace = "Main"
+                robotTelemetry.beginStaging()
 
                 try {
                     // Call user's loop method
@@ -151,16 +216,16 @@ abstract class ThreadedOpMode : LinearOpMode() {
 
 
                     // Commit staging buffer atomically
-                    telemetry.commitStaging()
+                    robotTelemetry.commitStaging()
                 } catch (e: Exception) {
                     // Discard staging on error
-                    telemetry.discardStaging()
+                    robotTelemetry.discardStaging()
                     throw e
                 }
 
 
                 // Update telemetry - displays all thread data + main loop data
-                telemetry.update()
+                robotTelemetry.update()
             }
         } finally {
             // Ensure threads are stopped even if exception occurs
@@ -302,4 +367,30 @@ abstract class ThreadedOpMode : LinearOpMode() {
         return RobotStateMachine.isState(state)
     }
 }
+
+/**
+ * Global access to gamepad1Ex.
+ * Convenience property for accessing the extended gamepad from anywhere.
+ * 
+ * Usage:
+ * ```
+ * if (gamepad1Ex.a.value) { ... }
+ * gamepad1Ex.rightTrigger.whileHeld().bind { ShootCommand() }
+ * ```
+ */
+val gamepad1Ex: GamepadEx
+    get() = ThreadedOpMode.getGamepad1Ex()
+
+/**
+ * Global access to gamepad2Ex.
+ * Convenience property for accessing the extended gamepad from anywhere.
+ * 
+ * Usage:
+ * ```
+ * if (gamepad2Ex.a.value) { ... }
+ * gamepad2Ex.rightTrigger.whileHeld().bind { ShootCommand() }
+ * ```
+ */
+val gamepad2Ex: GamepadEx
+    get() = ThreadedOpMode.getGamepad2Ex()
 

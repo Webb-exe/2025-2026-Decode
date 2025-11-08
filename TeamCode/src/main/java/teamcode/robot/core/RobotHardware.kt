@@ -2,7 +2,9 @@ package teamcode.robot.core
 
 import com.qualcomm.hardware.limelightvision.Limelight3A
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.hardware.Servo
 import com.qualcomm.robotcore.util.ElapsedTime
+import com.seattlesolvers.solverslib.hardware.motors.CRServoEx
 import com.seattlesolvers.solverslib.hardware.motors.Motor
 import com.seattlesolvers.solverslib.hardware.motors.MotorEx
 import com.seattlesolvers.solverslib.hardware.servos.ServoEx
@@ -28,6 +30,10 @@ object RobotHardware {
 
     // Servo
     lateinit var kickerServo: ServoEx
+
+    // Intake
+    lateinit var intakeServoLeft: CRServoEx
+    lateinit var intakeServoRight: CRServoEx
 
     // Limelight
     lateinit var limelight: Limelight3A
@@ -61,17 +67,24 @@ object RobotHardware {
         }
         turretShooterRightMotor = MotorEx(opMode.hardwareMap, "turretShooterRightMotor")
 
-        spindexterMotor = MotorEx(opMode.hardwareMap, "spindexterMotor").apply {
+        spindexterMotor = MotorEx(opMode.hardwareMap, "spindexterMotor", Motor.GoBILDA.RPM_312).apply {
+            setInverted(true)
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
+            resetEncoder()
+            setRunMode(Motor.RunMode.RawPower)
         }
 
         kickerServo = ServoEx(opMode.hardwareMap, "kickerServo")
+
+        intakeServoLeft = CRServoEx(opMode.hardwareMap, "intakeServoLeft")
+        intakeServoRight = CRServoEx(opMode.hardwareMap, "intakeServoRight")
+
 
         limelight = opMode.hardwareMap.get(Limelight3A::class.java, "limelight")
     }
 
     private fun initHardware() {
-        kickerServo.set(1.0);
+        kickerServo.set(0.01);
     }
 
     fun init(opModeInput: LinearOpMode, runtimeInput: ElapsedTime) {

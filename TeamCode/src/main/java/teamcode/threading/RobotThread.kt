@@ -1,6 +1,7 @@
 package teamcode.threading
 
 import com.qualcomm.robotcore.util.ElapsedTime
+import teamcode.robot.control.GamepadEx
 import teamcode.telemetry.RobotTelemetry
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
@@ -40,6 +41,36 @@ abstract class RobotThread : Thread {
 
     @get:JvmName("getTelemetryOrThrow")
     val telemetrySafe get() = telemetry
+
+    /**
+     * Access to gamepad1Ex from within threads.
+     * Provides convenient access to the global gamepad1Ex instance.
+     * 
+     * Usage in runLoop():
+     * ```
+     * override fun runLoop() {
+     *     if (gamepad1Ex.a.value) { ... }
+     *     val triggerValue = gamepad1Ex.rightTrigger.value
+     * }
+     * ```
+     */
+    protected val gamepad1Ex: GamepadEx
+        get() = ThreadedOpMode.getGamepad1Ex()
+
+    /**
+     * Access to gamepad2Ex from within threads.
+     * Provides convenient access to the global gamepad2Ex instance.
+     * 
+     * Usage in runLoop():
+     * ```
+     * override fun runLoop() {
+     *     if (gamepad2Ex.a.value) { ... }
+     *     val triggerValue = gamepad2Ex.rightTrigger.value
+     * }
+     * ```
+     */
+    protected val gamepad2Ex: GamepadEx
+        get() = ThreadedOpMode.getGamepad2Ex()
 
     /**
      * Get the update interval in milliseconds
