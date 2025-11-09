@@ -43,17 +43,17 @@ object RobotHardware {
 
     private fun setHardware() {
         leftFront = MotorEx(opMode.hardwareMap, "leftFrontDrive").apply {
-            setInverted(true)
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
         }
         leftBack = MotorEx(opMode.hardwareMap, "leftBackDrive").apply {
-            setInverted(true)
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
         }
         rightFront = MotorEx(opMode.hardwareMap, "rightFrontDrive").apply {
+            setInverted(true)
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
         }
         rightBack = MotorEx(opMode.hardwareMap, "rightBackDrive").apply {
+            setInverted(true)
             setZeroPowerBehavior(Motor.ZeroPowerBehavior.BRAKE)
         }
 

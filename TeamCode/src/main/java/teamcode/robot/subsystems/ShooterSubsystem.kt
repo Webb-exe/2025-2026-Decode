@@ -12,7 +12,7 @@ import kotlin.concurrent.Volatile
 @Configurable
 object ShooterConfig {
     @JvmField
-    var ShooterPower = 0.9
+    var ShooterPower = 0.6
     @JvmField
     var ShooterIdlePower = 0.2
     @JvmField
@@ -75,7 +75,7 @@ class ShooterSubsystem : Subsystem("Shooter", 20) {
             KickerState.DOWN -> {
                 currentState = ShooterState.SHOOTING
                 RobotHardware.kickerServo.set(ShooterConfig.KickerIdlePosition)
-                if (timer.elapsedMillis()>2000) {
+                if (timer.elapsedMillis()>300) {
                     kickerState = KickerState.IDLE
                     timer.stop()
                 }

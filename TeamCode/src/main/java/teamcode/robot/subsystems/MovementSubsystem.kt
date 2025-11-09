@@ -53,7 +53,7 @@ class MovementSubsystem : Subsystem("Movement", 5) {
     
     fun setDriveInput(gamepad: Gamepad) {
         setDriveValues(
-            -gamepad.left_stick_y.toDouble(),
+            gamepad.left_stick_y.toDouble(),
             gamepad.left_stick_x.toDouble(),
             gamepad.right_stick_x.toDouble()
         )

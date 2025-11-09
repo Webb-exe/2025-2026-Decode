@@ -28,7 +28,7 @@ class Teleop : ThreadedOpMode() {
     private lateinit var visionSubsystem: VisionSubsystem
     private lateinit var shooterSubsystem: ShooterSubsystem
     private lateinit var spindexerSubsystem: SpindexerSubsystem
-    private lateinit var intakeSubsystem: IntakeSubsystem
+//    private lateinit var intakeSubsystem: IntakeSubsystem
     private var lastA = false
     
     override fun initOpMode() {
@@ -37,7 +37,7 @@ class Teleop : ThreadedOpMode() {
         visionSubsystem = VisionSubsystem()
         shooterSubsystem = ShooterSubsystem()
         spindexerSubsystem = SpindexerSubsystem()
-        intakeSubsystem = IntakeSubsystem()
+//        intakeSubsystem = IntakeSubsystem()
         
         // ===== INIT PHASE LOGIC =====
         var alliance = Alliance.RED
