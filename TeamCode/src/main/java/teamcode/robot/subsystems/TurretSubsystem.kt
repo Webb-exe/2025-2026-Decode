@@ -47,7 +47,7 @@ class TurretSubsystem : Subsystem("Turret", 10) {
     
     override fun init() {
         // Wait for VisionSubsystem to be available (threads start concurrently)
-        vision = waitFor<VisionSubsystem>()
+        vision = current<VisionSubsystem>(10)
         
         turretPID = PID(TurretConfig.kP, TurretConfig.kI, TurretConfig.kD)
         turretPID.setOutputRange(-TurretConfig.SpeedClamp, TurretConfig.SpeedClamp)

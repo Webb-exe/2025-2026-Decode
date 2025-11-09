@@ -135,7 +135,7 @@ abstract class Command(
                         try {
                             val propertyType = prop.returnType.jvmErasure.java
                             if (Subsystem::class.java.isAssignableFrom(propertyType)) {
-                                val subsystem = RobotThread.currentByClass(propertyType as Class<out RobotThread>) as? Subsystem
+                                val subsystem = RobotThread.current(propertyType as Class<out RobotThread>) as? Subsystem
                                 if (subsystem != null && !requirements.contains(subsystem)) {
                                     dependencies[prop.name] = subsystem
                                     addRequirement(subsystem)
