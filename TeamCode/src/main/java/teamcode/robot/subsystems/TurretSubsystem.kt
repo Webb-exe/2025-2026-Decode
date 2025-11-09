@@ -62,11 +62,6 @@ class TurretSubsystem : Subsystem("Turret", 10) {
     
     override fun periodic() {
         if (!isEnabled) return
-
-        if (currentState == TurretState.MANUAL) {
-            setManualTurnSpeed(gamepad2Ex.`object`.left_stick_x.toDouble())
-            return
-        }
         
         if (!vision.hasTargets()) {
             RobotHardware.turretTurnMotor.set(0.0)
