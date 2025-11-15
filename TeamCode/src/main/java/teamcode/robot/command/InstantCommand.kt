@@ -1,45 +1,28 @@
 package teamcode.robot.command
 
-import teamcode.robot.core.subsystem.Subsystem
-
 /**
- * Command that executes an action once and immediately finishes.
- * Useful for simple one-time actions.
+ * A command that runs instantly and finishes immediately.
+ * 
+ * Useful for one-shot actions that don't need repeated execution.
+ * 
+ * Example:
+ * ```
+ * // Lambda style
+ * InstantCommand { println("Hello!") }
+ * 
+ * // With subsystem access
+ * InstantCommand {
+ *     val drive = RobotThread.current<DriveSubsystem>()
+ *     drive.resetEncoders()
+ * }
+ * ```
  */
-class InstantCommand(
-    private val subsystem: Subsystem,
-    private val action: () -> Unit
-) : Command() {
-    
-    init {
-        addRequirement(subsystem)
-    }
+class InstantCommand(private val action: () -> Unit) : Command() {
     
     override fun initialize() {
-        action()
-    }
-    
-    override fun execute() {
-        // Action already executed in initialize()
+        action.invoke()
     }
     
     override fun isFinished(): Boolean = true
 }
 
-/**
- * Instant command that doesn't require a subsystem.
- */
-class InstantCommandNoRequirement(
-    private val action: () -> Unit
-) : Command() {
-    
-    override fun initialize() {
-        action()
-    }
-    
-    override fun execute() {
-        // Action already executed
-    }
-    
-    override fun isFinished(): Boolean = true
-}

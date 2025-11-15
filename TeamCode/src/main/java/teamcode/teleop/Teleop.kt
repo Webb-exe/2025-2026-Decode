@@ -5,7 +5,9 @@ import teamcode.robot.core.Alliance
 import teamcode.robot.core.RobotHardware
 import teamcode.robot.core.state.RobotState
 import teamcode.robot.core.state.RobotStateMachine
+import teamcode.robot.subsystems.ColorSensorSubsystem
 import teamcode.robot.subsystems.IntakeSubsystem
+import teamcode.robot.subsystems.KickerSubsystem
 import teamcode.robot.subsystems.MovementSubsystem
 import teamcode.robot.subsystems.ShooterState
 import teamcode.robot.subsystems.ShooterSubsystem
@@ -14,6 +16,12 @@ import teamcode.robot.subsystems.TurretState
 import teamcode.robot.subsystems.TurretSubsystem
 import teamcode.robot.subsystems.VisionSubsystem
 import teamcode.threading.ThreadedOpMode
+import teamcode.commands.ShootAndTurn
+import teamcode.commands.TriggerKicker
+import teamcode.commands.SpindexerSpin
+import teamcode.robot.command.execute
+import teamcode.robot.subsystems.KickerState
+import teamcode.robot.subsystems.VisionPipeline
 import kotlin.math.min
 
 /**
@@ -23,43 +31,36 @@ import kotlin.math.min
 @TeleOp(name = "Teleop", group = "Teleop")
 class Teleop : ThreadedOpMode() {
     
+    // Subsystems
     private lateinit var movementSubsystem: MovementSubsystem
     private lateinit var turretSubsystem: TurretSubsystem
     private lateinit var visionSubsystem: VisionSubsystem
     private lateinit var shooterSubsystem: ShooterSubsystem
+    private lateinit var kickerSubsystem: KickerSubsystem
     private lateinit var spindexerSubsystem: SpindexerSubsystem
-//    private lateinit var intakeSubsystem: IntakeSubsystem
-    private var lastA = false
+    private lateinit var intakeSubsystem: IntakeSubsystem
+    private lateinit var colorSensorSubsystem: ColorSensorSubsystem
+
     
     override fun initOpMode() {
+        // Initialize subsystems
         movementSubsystem = MovementSubsystem()
         turretSubsystem = TurretSubsystem()
         visionSubsystem = VisionSubsystem()
         shooterSubsystem = ShooterSubsystem()
+        kickerSubsystem = KickerSubsystem()
         spindexerSubsystem = SpindexerSubsystem()
-//        intakeSubsystem = IntakeSubsystem()
-        
-        // ===== INIT PHASE LOGIC =====
-        var alliance = Alliance.RED
-        
-        while (opModeInInit()) {
+        intakeSubsystem = IntakeSubsystem()
+        colorSensorSubsystem = ColorSensorSubsystem()
+
             telemetry.addData("Status", "In Init")
-            
-            if (gamepad1.xWasPressed()) {
-                alliance = Alliance.BLUE
-            }
-            if (gamepad1.bWasPressed()) {
-                alliance = Alliance.RED
-            }
-            telemetry.update()
-        }
-        
-        RobotHardware.alliance = alliance
+
     }
-    
+
     override fun onStart() {
         turretSubsystem.enable()
-        turretSubsystem.enterManualMode()
+//        turretSubsystem.enterManualMode()
+        visionSubsystem.setPipeline(VisionPipeline.RED)
     }
     
     override fun mainLoop() {
@@ -70,12 +71,16 @@ class Teleop : ThreadedOpMode() {
                 }
             }
             RobotState.SHOOTING -> {
-                if (gamepad2Ex.rightTrigger.value<0.05 && shooterSubsystem.currentState==ShooterState.IDLE){
+                if (gamepad2Ex.rightTrigger.value<0.05 && kickerSubsystem.currentState== KickerState.IDLE){
                     RobotStateMachine.transitionTo(RobotState.IDLE)
                     return
                 }
+                // Schedule shoot command when B button is pressed
                 if (gamepad2Ex.b.wasPressed()){
-                    shooterSubsystem.triggerKicker()
+                    TriggerKicker().execute()
+                }
+                if (gamepad2Ex.dpadUp.wasPressed()){
+                    ShootAndTurn().execute()
                 }
             }
             RobotState.INTAKING -> {
@@ -85,46 +90,36 @@ class Teleop : ThreadedOpMode() {
 
         }
 
+        // Spindexer control - schedule cycle command when A button is pressed
         if (gamepad2Ex.a.wasPressed()){
-            spindexerSubsystem.changeTargetPositionByOffset(1)
+            SpindexerSpin(1).execute()
         }
 
-//        if (gamepad2Ex.rightBumper.wasPressed()){
-//            turretSubsystem.triggerStates()
+//        // Turret control - execute manual turret commands based on bumper input
+//        if (turretSubsystem.currentState == TurretState.MANUAL){
+//            if (gamepad2Ex.rightBumper.value){
+//                turretSubsystem
+//            } else if(gamepad2Ex.leftBumper.value){
+//                ManualTurretCommand(turretSubsystem, -1.0).execute()
+//            } else {
+//                ManualTurretCommand(turretSubsystem, 0.0).execute()
+//            }
 //        }
 
-        if (turretSubsystem.currentState== TurretState.MANUAL){
-            if (gamepad2Ex.rightBumper.value){
-                turretSubsystem.setManualTurnSpeed(1.0)
-            } else if(gamepad2Ex.leftBumper.value){
-                turretSubsystem.setManualTurnSpeed(-1.0)
-            }else{
-                turretSubsystem.setManualTurnSpeed(0.0)
-            }
-        }
-
+        // Drive control
         movementSubsystem.setDriveInput(gamepad1)
 
 
-//        RobotHardware.kickerServo.set(gamepad1Ex.leftTrigger.value)
-//        if (gamepad1Ex.rightTrigger.value != 0.0){
-//            RobotHardware.spindexterMotor.set(gamepad1Ex.rightTrigger.value);
-//        }
-//        else if (gamepad1Ex.leftTrigger.value != 0.0){
-//            RobotHardware.spindexterMotor.set(-gamepad1Ex.leftTrigger.value);
-//        }
-//        else{
-//            RobotHardware.spindexterMotor.set(0.0);
-//        }
-
-//        spindexerSubsystem.updateGamepad(gamepad1Ex.leftTrigger.value,gamepad1Ex.rightTrigger.value)
-
-
-
-
+        if(gamepad2Ex.dpadLeft.wasPressed()) {
+            RobotHardware.turretTurnServo.set(RobotHardware.turretTurnServo.get()+0.1)
+        }
+        if(gamepad2Ex.dpadRight.wasPressed()) {
+            RobotHardware.turretTurnServo.set(RobotHardware.turretTurnServo.get()-0.1)
+        }
         // ===== TELEMETRY =====
+        robotTelemetry.addData("Servo",RobotHardware.turretTurnServo.get())
         robotTelemetry.addData("Robot State", getState().name)
-        robotTelemetry.addData("Runtime", String.format("%.2f s", runtime.seconds()))
+        robotTelemetry.addData("Runtime", runtime.seconds())
     }
     
     override fun cleanup() {

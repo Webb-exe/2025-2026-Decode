@@ -16,17 +16,17 @@ object SpindexerConfig {
     @JvmField
     var tickPerRevolution: Double = 537.7
     @JvmField
-    var maxPower: Double = 0.8
+    var maxPower: Double = 0.9
     @JvmField
     var acceptedError: Int = 10
     @JvmField
     var positions: Int = 3
     @JvmField
-    var kp: Double = 0.8
+    var kp: Double = 0.60
     @JvmField
     var ki: Double = 0.0
     @JvmField
-    var kd: Double = 0.01
+    var kd: Double = 0.015
     @JvmField
     var pidScale: Double = 0.01
 }
@@ -38,16 +38,12 @@ enum class SpindexerState {
 
 class SpindexerSubsystem: Subsystem("Spindexer", 20) {
     @Volatile
-    var currentState: SpindexerState = SpindexerState.IDLE
+    final var currentState: SpindexerState = SpindexerState.IDLE
         private set
 
     var isEnabled = true
 
     private lateinit var pid: PID
-
-    private var leftTrigger = 0.0;
-    private var rightTrigger = 0.0;
-
 
     private var degrees: Double = 0.0
         set(value){
@@ -73,15 +69,15 @@ class SpindexerSubsystem: Subsystem("Spindexer", 20) {
         setTargetDegrees(targetDegrees)
     }
 
+    /**
+     * Change position by an offset amount
+     * Called from teleop when cycling through positions
+     */
     fun changeTargetPositionByOffset(offset: Int) {
         val currentPosition = ((degrees / 360.0) * SpindexerConfig.positions).toInt()
         val newPosition = (currentPosition + offset).mod(SpindexerConfig.positions)
+        currentState = SpindexerState.SPINNING
         setTargetPosition(newPosition)
-    }
-
-    fun updateGamepad(left:Double,right:Double){
-        leftTrigger=left
-        rightTrigger=right
     }
 
     /**
@@ -149,25 +145,11 @@ class SpindexerSubsystem: Subsystem("Spindexer", 20) {
     }
 
     override fun periodic() {
-         if (!isEnabled || current<ShooterSubsystem>().currentState!==ShooterState.IDLE){
+         if (!isEnabled || current<KickerSubsystem>().currentState !== KickerState.IDLE){
              currentState = SpindexerState.IDLE
              RobotHardware.spindexterMotor.set(0.0)
              return
          }
-
-         if (leftTrigger!=0.0){
-             currentState = SpindexerState.SPINNING
-             RobotHardware.spindexterMotor.set(leftTrigger)
-         }
-         else if(rightTrigger!=0.0){
-             currentState = SpindexerState.SPINNING
-             RobotHardware.spindexterMotor.set(-rightTrigger)
-         }
-         else{
-             currentState = SpindexerState.IDLE
-             RobotHardware.spindexterMotor.set(0.0)
-         }
-
         
        // Get current motor position and normalize
        val currentTicks = RobotHardware.spindexterMotor.currentPosition.toDouble()
@@ -209,12 +191,12 @@ class SpindexerSubsystem: Subsystem("Spindexer", 20) {
         val normalizedTargetTicks = normalizeTicks(targetTicks)
         
         telemetry.addData("State", currentState.name)
-        telemetry.addData("Target Degrees", String.format("%.2f", degrees))
-        telemetry.addData("Current Ticks", String.format("%.2f", normalizedCurrentTicks))
+        telemetry.addData("Target Degrees", degrees)
+        telemetry.addData("Current Ticks", normalizedCurrentTicks)
         telemetry.addData("Absolute Ticks", currentTicks)
-        telemetry.addData("Target Ticks", String.format("%.2f", normalizedTargetTicks))
-        telemetry.addData("Error", String.format("%.2f", pid.error))
+        telemetry.addData("Target Ticks", normalizedTargetTicks)
+        telemetry.addData("Error", pid.error)
         telemetry.addData("At Position", pid.isAtPosition())
-        telemetry.addData("Motor Power", String.format("%.2f", RobotHardware.spindexterMotor.get()))
+        telemetry.addData("Motor Power", RobotHardware.spindexterMotor.get())
     }
 }

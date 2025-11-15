@@ -1,23 +1,30 @@
 package teamcode.robot.control
 
 import com.qualcomm.robotcore.hardware.Gamepad
-import teamcode.robot.command.Command
 import kotlin.concurrent.Volatile
 
 /**
- * Extended gamepad wrapper that provides binding functionality.
- * Wraps the standard FTC Gamepad and adds command binding capabilities.
+ * Extended gamepad wrapper that provides convenient access to gamepad state.
+ * Wraps the standard FTC Gamepad and adds state tracking for buttons.
  *
  * Usage:
  * ```
- * gamepad1Ex.rightTrigger.whileHeld().bind { ShootCommand() }
- * gamepad1Ex.a.whenPressed().bind { JumpCommand() }
+ * val gamepad1Ex = GamepadEx(gamepad1)
+ * 
+ * // Direct boolean access
+ * if (gamepad1Ex.a.value) { ... }
+ * if (gamepad1Ex.rightTrigger.value > 0.5) { ... }
+ * 
+ * // State tracking
+ * if (gamepad1Ex.a.wasPressed()) { ... }
+ * 
+ * // Direct gamepad access
+ * val rawGamepad = gamepad1Ex.getGamepad()
  * ```
  */
 class GamepadEx(
     private val gamepad: Gamepad
 ) {
-    private val buttonBindingMap = mutableMapOf<String, AutoBinding?>()
     
     // Cache button triggers to preserve state between calls
     private val _a = ButtonTrigger("a") { gamepad.a }
@@ -33,8 +40,10 @@ class GamepadEx(
     private val _back = ButtonTrigger("back") { gamepad.back }
     private val _guide = ButtonTrigger("guide") { gamepad.guide }
     private val _start = ButtonTrigger("start") { gamepad.start }
-    private val _leftTrigger = TriggerBinding("leftTrigger", { gamepad.left_trigger.toDouble() })
-    private val _rightTrigger = TriggerBinding("rightTrigger", { gamepad.right_trigger.toDouble() })
+    private val _leftTrigger = TriggerBinding("leftTrigger") { gamepad.left_trigger.toDouble() }
+    private val _rightTrigger = TriggerBinding("rightTrigger") { gamepad.right_trigger.toDouble() }
+    private val _leftStickButton = ButtonTrigger("leftStickButton") { gamepad.left_stick_button }
+    private val _rightStickButton = ButtonTrigger("rightStickButton") { gamepad.right_stick_button }
 
     /**
      * Get the underlying gamepad object for direct access to raw properties.
@@ -75,62 +84,7 @@ class GamepadEx(
         get() = gamepad
 
     /**
-     * Get button ID for tracking.
-     */
-    private fun getButtonId(button: String, action: String): String {
-        return "${gamepad.hashCode()}_${button}_$action"
-    }
-
-    /**
-     * Create and register a binding for a button.
-     * Returns the binding if created, null if already exists and overwrite=false.
-     */
-    private fun createBinding(
-        binding: AutoBinding,
-        buttonId: String,
-        overwrite: Boolean = true
-    ): AutoBinding? {
-        val existingBinding = buttonBindingMap[buttonId]
-
-        if (existingBinding != null) {
-            if (overwrite) {
-                // Remove old binding
-                existingBinding.unbind()
-                buttonBindingMap[buttonId] = binding
-                BindingManager.register(binding)
-                return binding
-            } else {
-                // Don't create new binding if one already exists
-                return null
-            }
-        } else {
-            // No existing binding, create new one
-            buttonBindingMap[buttonId] = binding
-            BindingManager.register(binding)
-            return binding
-        }
-    }
-
-    /**
-     * Remove all bindings for this gamepad.
-     */
-    fun unbindAll() {
-        val bindings = buttonBindingMap.values.filterNotNull()
-        BindingManager.unbindAll(bindings)
-        buttonBindingMap.clear()
-    }
-
-    /**
-     * Get all bindings for this gamepad.
-     */
-    fun getBindings(): List<AutoBinding> {
-        // Clean up removed bindings
-        buttonBindingMap.entries.removeAll { it.value?.isRegistered() != true }
-        return buttonBindingMap.values.filterNotNull()
-    }
-
-    /**
-     * Button trigger for gamepad buttons.
+     * Button trigger for gamepad buttons with state tracking.
      */
     inner class ButtonTrigger(
         private val buttonName: String,
@@ -172,93 +126,75 @@ class GamepadEx(
             get() = this@GamepadEx.gamepad
 
         /**
-         * Create a bindable for whenPressed action.
-         */
-        fun whenPressed(overwrite: Boolean = true): Bindable {
-            return Bindable(
-                gamepadEx = this@GamepadEx,
-                buttonName = buttonName,
-                actionName = "whenPressed",
-                condition = {
-                    val isPressed = button()
-                    val pressed = isPressed && !state.wasPressed
-                    state.wasPressed = isPressed
-                    pressed
-                },
-                overwrite = overwrite
-            )
-        }
-
-        /**
-         * Create a bindable for whileHeld action.
-         */
-        fun whileHeld(overwrite: Boolean = true): Bindable {
-            return Bindable(
-                gamepadEx = this@GamepadEx,
-                buttonName = buttonName,
-                actionName = "whileHeld",
-                condition = { button() },
-                overwrite = overwrite
-            )
-        }
-
-        /**
-         * Create a bindable for whenReleased action.
-         */
-        fun whenReleased(overwrite: Boolean = true): Bindable {
-            return Bindable(
-                gamepadEx = this@GamepadEx,
-                buttonName = buttonName,
-                actionName = "whenReleased",
-                condition = {
-                    val isPressed = button()
-                    val released = !isPressed && state.wasPressed
-                    state.wasPressed = isPressed
-                    released
-                },
-                overwrite = overwrite
-            )
-        }
-
-        /**
-         * Check if the button was just pressed (since last call).
-         *
+         * Check if the button was just pressed (rising edge detection).
+         * Returns true only on the frame when the button transitions from not pressed to pressed.
+         * 
+         * Example:
+         * ```
+         * if (gamepad1Ex.a.wasPressed()) {
+         *     // Execute once per button press
+         * }
+         * ```
          */
         fun wasPressed(): Boolean {
-            val pressed = button() && !state.wasPressed
-            state.wasPressed = button()
+            val currentState = button()
+            val pressed = currentState && !state.wasPressed
+            state.wasPressed = currentState
             return pressed
+        }
+
+        /**
+         * Check if the button was just released (falling edge detection).
+         * Returns true only on the frame when the button transitions from pressed to not pressed.
+         * 
+         * Example:
+         * ```
+         * if (gamepad1Ex.a.wasReleased()) {
+         *     // Execute once per button release
+         * }
+         * ```
+         */
+        fun wasReleased(): Boolean {
+            val currentState = button()
+            val released = !currentState && state.wasPressed
+            state.wasPressed = currentState
+            return released
+        }
+
+        /**
+         * Reset the internal state tracking.
+         * Useful if you need to clear the pressed state.
+         */
+        fun resetState() {
+            state.wasPressed = false
         }
     }
 
     /**
-     * Trigger binding for gamepad triggers.
+     * Trigger binding for gamepad analog triggers.
      */
     inner class TriggerBinding(
         private val triggerName: String,
-        private val triggerValue: () -> Double,
-        private val threshold: Double = 0.1
+        private val triggerValue: () -> Double
     ) {
-
         /**
-         * Property access to the current button value (Boolean).
-         * Shorthand for getting the button state.
-         *
+         * Property access to the current trigger value (Double, 0.0 to 1.0).
+         * 
          * Example:
          * ```
-         * if (gamepad1Ex.a.value) { ... }
+         * val speed = gamepad1Ex.rightTrigger.value
          * ```
          */
-        val value
+        val value: Double
             get() = triggerValue()
 
         /**
          * Property access to the original Gamepad object.
-         * Allows access to all gamepad properties from the button trigger.
+         * Allows access to all gamepad properties from the trigger.
          *
          * Example:
          * ```
-         * val gamepad = gamepad1Ex.a.`object`
+         * val gamepad = gamepad1Ex.rightTrigger.`object`
          * if (gamepad.a) { ... }
          * ```
          */
@@ -266,47 +202,17 @@ class GamepadEx(
             get() = this@GamepadEx.gamepad
 
         /**
-         * Create a bindable for whileHeld action.
+         * Check if the trigger is pressed beyond a threshold.
+         * 
+         * @param threshold The threshold value (default 0.1)
+         * @return true if trigger value > threshold
          */
-        fun whileHeld(overwrite: Boolean = true): Bindable {
-            return Bindable(
-                gamepadEx = this@GamepadEx,
-                buttonName = triggerName,
-                actionName = "whileHeld",
-                condition = { triggerValue() > threshold },
-                overwrite = overwrite
-            )
+        fun isPressed(threshold: Double = 0.1): Boolean {
+            return triggerValue() > threshold
         }
     }
 
-    /**
-     * Bindable object that can create a binding.
-     */
-    class Bindable(
-        private val gamepadEx: GamepadEx,
-        private val buttonName: String,
-        private val actionName: String,
-        private val condition: () -> Boolean,
-        private val overwrite: Boolean = true
-    ) {
-        /**
-         * Create and register the binding.
-         * Returns the AutoBinding object if created, null if binding already exists and overwrite=false.
-         * The binding is automatically registered in the global BindingManager.
-         */
-        fun bind(commandFactory: () -> Command): AutoBinding? {
-            val binding = AutoBinding(
-                condition = condition,
-                commandFactory = commandFactory,
-                cancelOnConditionFalse = actionName == "whileHeld"
-            )
-
-            val buttonId = gamepadEx.getButtonId(buttonName, actionName)
-            return gamepadEx.createBinding(binding, buttonId, overwrite)
-        }
-    }
-
-    // Button triggers - primary API for bindings
+    // Button triggers - primary API
     val a: ButtonTrigger
         get() = _a
 
@@ -346,11 +252,31 @@ class GamepadEx(
     val start: ButtonTrigger
         get() = _start
 
+    val leftStickButton: ButtonTrigger
+        get() = _leftStickButton
+
+    val rightStickButton: ButtonTrigger
+        get() = _rightStickButton
+
     // Trigger bindings
     val leftTrigger: TriggerBinding
         get() = _leftTrigger
 
     val rightTrigger: TriggerBinding
         get() = _rightTrigger
+
+    // Direct access to analog stick values
+    val leftStickX: Double
+        get() = gamepad.left_stick_x.toDouble()
+
+    val leftStickY: Double
+        get() = gamepad.left_stick_y.toDouble()
+
+    val rightStickX: Double
+        get() = gamepad.right_stick_x.toDouble()
+
+    val rightStickY: Double
+        get() = gamepad.right_stick_y.toDouble()
 }
+
 

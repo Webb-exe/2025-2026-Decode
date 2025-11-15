@@ -1,7 +1,9 @@
 package teamcode.robot.core
 
 import com.qualcomm.hardware.limelightvision.Limelight3A
+import com.qualcomm.hardware.rev.RevColorSensorV3
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.hardware.ColorSensor
 import com.qualcomm.robotcore.hardware.Servo
 import com.qualcomm.robotcore.util.ElapsedTime
 import com.seattlesolvers.solverslib.hardware.motors.CRServoEx
@@ -30,6 +32,7 @@ object RobotHardware {
 
     // Servo
     lateinit var kickerServo: ServoEx
+    lateinit var turretTurnServo: ServoEx
 
     // Intake
     lateinit var intakeServoLeft: CRServoEx
@@ -38,8 +41,10 @@ object RobotHardware {
     // Limelight
     lateinit var limelight: Limelight3A
 
-    // State
-    var alliance: Alliance = Alliance.RED
+    // Color sensor
+    lateinit var colorSensorBack: ColorSensor
+    lateinit var colorSensorLeft: RevColorSensorV3
+    lateinit var colorSensorRight: ColorSensor
 
     private fun setHardware() {
         leftFront = MotorEx(opMode.hardwareMap, "leftFrontDrive").apply {
@@ -75,16 +80,22 @@ object RobotHardware {
         }
 
         kickerServo = ServoEx(opMode.hardwareMap, "kickerServo")
+        turretTurnServo = ServoEx(opMode.hardwareMap, "turretTurnServo")
 
         intakeServoLeft = CRServoEx(opMode.hardwareMap, "intakeServoLeft")
         intakeServoRight = CRServoEx(opMode.hardwareMap, "intakeServoRight")
 
 
         limelight = opMode.hardwareMap.get(Limelight3A::class.java, "limelight")
+
+        colorSensorBack = opMode.hardwareMap.get(ColorSensor::class.java, "colorSensorBack")
+        colorSensorLeft = opMode.hardwareMap.get(RevColorSensorV3::class.java, "colorSensorLeft")
+        colorSensorRight = opMode.hardwareMap.get(ColorSensor::class.java, "colorSensorRight")
     }
 
     private fun initHardware() {
-        kickerServo.set(0.01);
+        kickerServo.set(0.0);
+        turretTurnServo.set(0.5)
     }
 
     fun init(opModeInput: LinearOpMode, runtimeInput: ElapsedTime) {

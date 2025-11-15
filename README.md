@@ -1,3 +1,5 @@
+# Do not try and build off this. This codebase is insanely bad and should not be used as a reference
+
 ## NOTICE
 
 This repository contains the public FTC SDK for the DECODE (2025-2026) competition season.

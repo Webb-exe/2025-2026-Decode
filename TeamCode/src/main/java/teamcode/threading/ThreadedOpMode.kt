@@ -4,9 +4,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.util.ElapsedTime
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import com.qualcomm.robotcore.hardware.Gamepad
-import teamcode.robot.control.CommandScheduler
+import teamcode.robot.command.CommandScheduler
 import teamcode.robot.control.GamepadEx
-import teamcode.robot.control.StateDefaultCommands
 import teamcode.robot.core.RobotHardware
 import teamcode.robot.core.state.RobotState
 import teamcode.robot.core.state.RobotStateMachine
@@ -33,10 +32,10 @@ abstract class ThreadedOpMode : LinearOpMode() {
     protected lateinit var robotTelemetry: RobotTelemetry
     
     /**
-     * Command scheduler for managing commands.
-     * Automatically created and managed by ThreadedOpMode.
+     * Command scheduler - manages command lifecycle automatically.
+     * Available after initialization for scheduling commands.
      */
-    private lateinit var commandScheduler: CommandScheduler
+    protected lateinit var commandScheduler: CommandScheduler
 
     /**
      * Get the original FTC telemetry object
@@ -168,19 +167,16 @@ abstract class ThreadedOpMode : LinearOpMode() {
         // Initialize robot hardware
         RobotHardware.init(this, runtime)
 
+        
+        // Create and initialize command scheduler
+        commandScheduler = CommandScheduler()
+        CommandScheduler.setInstance(commandScheduler)
+        threadManager.addThread(commandScheduler)
+
 
         // Initialize subsystems and command system
         // Subsystems will auto-register themselves during construction
         initOpMode()
-        
-        // Create and initialize command scheduler
-        commandScheduler = CommandScheduler(20)
-        threadManager.addThread(commandScheduler)
-        commandScheduler.telemetry = robotTelemetry
-        CommandScheduler.register(commandScheduler)
-        
-        // Automatically initialize StateDefaultCommands
-        StateDefaultCommands.initialize()
 
         // Set telemetry for all threads
         for (thread in threadManager.getThreads()) {
@@ -230,9 +226,9 @@ abstract class ThreadedOpMode : LinearOpMode() {
         } finally {
             // Ensure threads are stopped even if exception occurs
             threadManager.stopAll()
-            // Cancel all commands before cleanup
-            commandScheduler.cancelAll()
             cleanup()
+            // Clear command scheduler instance
+            CommandScheduler.setInstance(null)
             // Clear current instance
             setCurrentInstance(null)
         }
@@ -310,15 +306,6 @@ abstract class ThreadedOpMode : LinearOpMode() {
      */
     protected open fun cleanup() {}
 
-    /**
-     * Get the command scheduler instance.
-     * The scheduler is automatically created and managed by ThreadedOpMode.
-     * 
-     * @return The CommandScheduler instance
-     */
-    fun getCommandScheduler(): CommandScheduler {
-        return commandScheduler ?: error("Command scheduler not initialized. This should not happen.")
-    }
 
     val runtimeTime: ElapsedTime
         /**

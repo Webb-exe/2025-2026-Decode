@@ -42,7 +42,7 @@ class MovementSubsystem : Subsystem("Movement", 5) {
     private var speedMultiplier = 1.0
     
     @Volatile
-    var isEnabled: Boolean = true
+    final var isEnabled: Boolean = true
         private set
     
     @Volatile
@@ -152,7 +152,7 @@ class MovementSubsystem : Subsystem("Movement", 5) {
     override fun updateTelemetry() {
         super.updateTelemetry()
         telemetry.addData("Enabled", isEnabled)
-        telemetry.addData("Speed", String.format("%.1f%%", speedMultiplier * 100))
+        telemetry.addData("Speed", speedMultiplier * 100)
         telemetry.addData("Field Centric", isFieldCentric)
     }
 }

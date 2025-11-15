@@ -8,6 +8,12 @@ import teamcode.robot.core.subsystem.Subsystem
 import java.util.function.Consumer
 import kotlin.concurrent.Volatile
 
+enum class VisionPipeline(val id: Int) {
+    OBELISK(0),
+    RED(1),
+    BLUE(2),
+}
+
 /**
  * Vision subsystem for processing Limelight data.
  * Runs continuously on its own thread.
@@ -18,19 +24,21 @@ class VisionSubsystem : Subsystem("Vision", 100) {
     private var targetsDetected = false
     
     @Volatile
-    var targetX: Double = 0.0
+    final var targetX: Double = 0.0
         private set
     
     @Volatile
-    var targetY: Double = 0.0
+    final var targetY: Double = 0.0
         private set
     
     @Volatile
-    var targetArea: Double = 0.0
+    final var targetArea: Double = 0.0
         private set
     
     private val aprilTagsLock = Any()
     private var aprilTags: MutableMap<Int?, AprilTag?> = HashMap()
+
+    private var currentPipeline = VisionPipeline.OBELISK
     
     class AprilTag(val id: Int, val yDegrees: Double, val xDegrees: Double)
     
@@ -88,10 +96,14 @@ class VisionSubsystem : Subsystem("Vision", 100) {
             }
         }
     }
+
+    fun setPipeline(pipeline: VisionPipeline) {
+        if (currentPipeline == pipeline) return
+        currentPipeline = pipeline
+        RobotHardware.limelight.pipelineSwitch(pipeline.id)
+    }
     
     fun hasTargets(): Boolean = targetsDetected
-    
-    val limelight: Limelight3A? get() = RobotHardware.limelight
     
     fun getAprilTags(): Array<AprilTag?> {
         synchronized(aprilTagsLock) {
@@ -124,9 +136,9 @@ class VisionSubsystem : Subsystem("Vision", 100) {
         super.updateTelemetry()
         telemetry.addData("Status", "Running")
         telemetry.addData("Targets", targetsDetected)
-        telemetry.addData("X", String.format("%.2f°", targetX))
-        telemetry.addData("Y", String.format("%.2f°", targetY))
-        telemetry.addData("Area", String.format("%.2f%%", targetArea))
+        telemetry.addData("X", targetX)
+        telemetry.addData("Y", targetY)
+        telemetry.addData("Area", targetArea)
         
         synchronized(aprilTagsLock) {
             telemetry.addData("AprilTags", aprilTags.size)
